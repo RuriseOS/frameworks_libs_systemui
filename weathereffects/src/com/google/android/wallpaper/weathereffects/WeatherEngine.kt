@@ -32,6 +32,8 @@ import com.google.android.torus.core.wallpaper.listener.LiveWallpaperEventListen
 import com.google.android.torus.core.wallpaper.listener.LiveWallpaperKeyguardEventListener
 import com.google.android.wallpaper.weathereffects.domain.WeatherEffectsInteractor
 import com.google.android.wallpaper.weathereffects.graphics.WeatherEffect
+import com.google.android.wallpaper.weathereffects.graphics.clouds.CloudsEffect
+import com.google.android.wallpaper.weathereffects.graphics.clouds.CloudsEffectConfig
 import com.google.android.wallpaper.weathereffects.graphics.fog.FogEffect
 import com.google.android.wallpaper.weathereffects.graphics.fog.FogEffectConfig
 import com.google.android.wallpaper.weathereffects.graphics.none.NoEffect
@@ -222,6 +224,21 @@ class WeatherEngine(
                         screenSize.toSizeF(),
                     )
             }
+
+            WallpaperInfoContract.WeatherEffect.CLOUDS -> {
+                val cloudsConfig =
+                    CloudsEffectConfig(context.assets, context.resources.displayMetrics.density)
+
+                activeEffect =
+                    CloudsEffect(
+                        cloudsConfig,
+                        foreground,
+                        background,
+                        effectIntensity,
+                        screenSize.toSizeF(),
+                    )
+            }
+
             WallpaperInfoContract.WeatherEffect.SNOW -> {
                 val snowConfig =
                     SnowEffectConfig(context.assets, context.resources.displayMetrics.density)

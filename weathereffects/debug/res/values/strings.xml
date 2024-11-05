@@ -21,6 +21,7 @@
     <string name="set_wallpaper" translatable="false">Set Wallpaper</string>
     <string name="button_rain" translatable="false">Rain</string>
     <string name="button_fog" translatable="false">Fog</string>
+    <string name="button_clouds" translatable="false">Clouds</string>
     <string name="button_snow" translatable="false">Snow</string>
     <string name="button_sunny" translatable="false">Sun</string>
     <string name="button_clear" translatable="false">Clear Weather</string>
