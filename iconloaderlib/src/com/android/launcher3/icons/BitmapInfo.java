@@ -126,14 +126,16 @@ public class BitmapInfo {
     }
 
     public final boolean isLowRes() {
-        return LOW_RES_ICON == icon;
+        return getMatchingLookupFlag().useLowRes();
     }
 
     /**
      * Returns the lookup flag to match this current state of this info
      */
     public CacheLookupFlag getMatchingLookupFlag() {
-        return DEFAULT_LOOKUP_FLAG.withUseLowRes(isLowRes());
+        return DEFAULT_LOOKUP_FLAG
+                .withUseLowRes(LOW_RES_ICON == icon)
+                .withThemeIcon(mThemedBitmap != null);
     }
 
     /**
@@ -170,7 +172,8 @@ public class BitmapInfo {
         FastBitmapDrawable drawable;
         if (isLowRes()) {
             drawable = new PlaceHolderIconDrawable(this, context);
-        } else  if ((creationFlags & FLAG_THEMED) != 0 && mThemedBitmap != null) {
+        } else  if ((creationFlags & FLAG_THEMED) != 0 && mThemedBitmap != null
+                && mThemedBitmap != ThemedBitmap.NOT_SUPPORTED) {
             drawable = mThemedBitmap.newDrawable(this, context);
         } else {
             drawable = new FastBitmapDrawable(this);
