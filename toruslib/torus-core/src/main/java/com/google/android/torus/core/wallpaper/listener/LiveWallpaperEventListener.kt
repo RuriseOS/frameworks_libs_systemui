@@ -18,6 +18,7 @@ package com.google.android.torus.core.wallpaper.listener
 
 import android.app.WallpaperColors
 import android.os.Bundle
+import android.service.wallpaper.WallpaperService
 
 /**
  * Interface that is used to implement specific wallpaper callbacks like offset change (user swipes
@@ -100,6 +101,9 @@ interface LiveWallpaperEventListener {
      *   the value is not included or is -1, the Y screen location is unknown.
      */
     fun onSleep(extras: Bundle)
+
+    /** @see WallpaperService.Engine.onAmbientModeChanged */
+    fun onAmbientModeChanged(inAmbientMode: Boolean, animationDuration: Long) {}
 
     /**
      * Indicates whether the zoom animation should be handled in WindowManager. Preferred to be set
