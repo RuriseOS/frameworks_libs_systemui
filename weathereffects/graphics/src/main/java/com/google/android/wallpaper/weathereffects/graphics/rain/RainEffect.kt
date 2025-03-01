@@ -28,6 +28,7 @@ import com.google.android.wallpaper.weathereffects.graphics.FrameBuffer
 import com.google.android.wallpaper.weathereffects.graphics.WeatherEffect.Companion.DEFAULT_INTENSITY
 import com.google.android.wallpaper.weathereffects.graphics.WeatherEffectBase
 import com.google.android.wallpaper.weathereffects.graphics.utils.GraphicsUtils
+import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.getScale
 import com.google.android.wallpaper.weathereffects.graphics.utils.TimeUtils
 import java.util.concurrent.Executor
 
@@ -50,8 +51,8 @@ class RainEffect(
         FrameBuffer(background.width, background.height).apply {
             setRenderEffect(
                 RenderEffect.createBlurEffect(
-                    2f / bitmapScale,
-                    2f / bitmapScale,
+                    BLUR_RADIUS / bitmapScale,
+                    BLUR_RADIUS / bitmapScale,
                     Shader.TileMode.CLAMP,
                 )
             )
@@ -77,13 +78,30 @@ class RainEffect(
         canvas.drawPaint(rainPaint)
     }
 
+    override fun release() {
+        super.release()
+        outlineBuffer.close()
+    }
+
     override fun setBitmaps(foreground: Bitmap?, background: Bitmap): Boolean {
         if (!super.setBitmaps(foreground, background)) {
             return false
         }
+        outlineBuffer.close()
+        outlineBuffer = FrameBuffer(background.width, background.height)
+
+        bitmapScale = getScale(parallaxMatrix)
+        // Different from snow effects, we only need to change blur radius when bitmaps change
+        // it only gives the range of rain splashes and doesn't influence the visual effects
+        outlineBuffer.setRenderEffect(
+            RenderEffect.createBlurEffect(
+                BLUR_RADIUS / bitmapScale,
+                BLUR_RADIUS / bitmapScale,
+                Shader.TileMode.CLAMP,
+            )
+        )
 
         updateTextureUniforms()
-        createOutlineBuffer()
         return true
     }
 
@@ -109,6 +127,7 @@ class RainEffect(
             "background",
             BitmapShader(super.background, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
         )
+        createOutlineBuffer()
     }
 
     /**
@@ -154,5 +173,6 @@ class RainEffect(
 
     companion object {
         const val MAX_RAIN_OUTLINE_THICKNESS = 11f
+        const val BLUR_RADIUS = 2f
     }
 }

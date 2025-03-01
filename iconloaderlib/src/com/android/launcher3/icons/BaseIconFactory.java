@@ -93,9 +93,6 @@ public class BaseIconFactory implements AutoCloseable {
     protected IconThemeController mThemeController;
 
     @Nullable
-    private IconNormalizer mNormalizer;
-
-    @Nullable
     private ShadowGenerator mShadowGenerator;
 
     // Shadow bitmap used as background for theme icons
@@ -104,6 +101,8 @@ public class BaseIconFactory implements AutoCloseable {
     private int mWrapperBackgroundColor = DEFAULT_WRAPPER_BACKGROUND;
 
     private static int PLACEHOLDER_BACKGROUND_COLOR = Color.rgb(245, 245, 245);
+
+    private final boolean mShouldForceThemeIcon;
 
     protected BaseIconFactory(Context context, int fullResIconDpi, int iconBitmapSize,
             boolean unused) {
@@ -121,6 +120,9 @@ public class BaseIconFactory implements AutoCloseable {
         mCanvas = new Canvas();
         mCanvas.setDrawFilter(new PaintFlagsDrawFilter(DITHER_FLAG, FILTER_BITMAP_FLAG));
         clear();
+
+        mShouldForceThemeIcon = mContext.getResources().getBoolean(
+                R.bool.enable_forced_themed_icon);
     }
 
     protected void clear() {
@@ -133,14 +135,6 @@ public class BaseIconFactory implements AutoCloseable {
             mShadowGenerator = new ShadowGenerator(mIconBitmapSize);
         }
         return mShadowGenerator;
-    }
-
-    @NonNull
-    public IconNormalizer getNormalizer() {
-        if (mNormalizer == null) {
-            mNormalizer = new IconNormalizer(mContext, mIconBitmapSize);
-        }
-        return mNormalizer;
     }
 
     @Nullable
@@ -242,8 +236,14 @@ public class BaseIconFactory implements AutoCloseable {
         if (adaptiveIcon instanceof Extender extender) {
             info = extender.getExtendedInfo(bitmap, color, this, scale[0]);
         } else if (IconProvider.ATLEAST_T && mThemeController != null && adaptiveIcon != null) {
-            info.setThemedBitmap(mThemeController.createThemedBitmap(
-                    adaptiveIcon, info, this, options == null ? null : options.mSourceHint));
+            info.setThemedBitmap(
+                    mThemeController.createThemedBitmap(
+                        adaptiveIcon,
+                        info,
+                        this,
+                        options == null ? null : options.mSourceHint
+                    )
+            );
         }
         info = info.withFlags(getBitmapFlagOp(options));
         return info;
@@ -268,6 +268,13 @@ public class BaseIconFactory implements AutoCloseable {
         return op;
     }
 
+    /**
+     * @return True if forced theme icon is enabled
+     */
+    public boolean shouldForceThemeIcon() {
+        return mShouldForceThemeIcon;
+    }
+
     @NonNull
     protected UserIconInfo getUserInfo(@NonNull UserHandle user) {
         int key = user.hashCode();
@@ -287,8 +294,12 @@ public class BaseIconFactory implements AutoCloseable {
     }
 
     @NonNull
-    protected Path getShapePath(AdaptiveIconDrawable drawable, Rect iconBounds) {
+    public Path getShapePath(AdaptiveIconDrawable drawable, Rect iconBounds) {
         return drawable.getIconMask();
+    }
+
+    public float getIconScale() {
+        return 1f;
     }
 
     @NonNull
@@ -322,9 +333,8 @@ public class BaseIconFactory implements AutoCloseable {
             return null;
         }
 
-        AdaptiveIconDrawable adaptiveIcon = wrapToAdaptiveIcon(icon);
-        outScale[0] = getNormalizer().getScale(adaptiveIcon);
-        return adaptiveIcon;
+        outScale[0] = IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
+        return wrapToAdaptiveIcon(icon);
     }
 
     /**
@@ -356,7 +366,7 @@ public class BaseIconFactory implements AutoCloseable {
             AdaptiveIconDrawable dr = new AdaptiveIconDrawable(
                     new ColorDrawable(mWrapperBackgroundColor), foreground);
             dr.setBounds(0, 0, 1, 1);
-            float scale = getNormalizer().getScale(icon);
+            float scale = new IconNormalizer(mIconBitmapSize).getScale(icon);
             foreground.setDrawable(createScaledDrawable(icon, scale * LEGACY_ICON_SCALE));
             return dr;
         }

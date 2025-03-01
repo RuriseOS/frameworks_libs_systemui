@@ -122,7 +122,7 @@ vec4 main(float2 fragCoord) {
     // 1.4. Blend with the foreground. Any effect from here will be in front of the subject.
     color.rgb = normalBlend(color.rgb, colorForeground.rgb, colorForeground.a);
 
-    // (1.5. Draw splashes)
+    // 1.5. Draw splashes
     color.rgb = drawSplashes(uv, fragCoord, color.rgb);
 
     // 1.6. Generate a layer of rain in front of the subject (bigger and faster).

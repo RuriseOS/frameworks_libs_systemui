@@ -33,6 +33,7 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sign
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonDisposableHandle.dispose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,7 +70,7 @@ class MotionValueToolkit(val composeTestRule: ComposeContentTestRule) {
 
         internal const val TAG = "MotionValueToolkit"
 
-        private fun <T> TimeSeries.dataPoints(featureName: String): List<T> {
+        fun <T> TimeSeries.dataPoints(featureName: String): List<T> {
             @Suppress("UNCHECKED_CAST")
             return (features[featureName] as Feature<T>).dataPoints.map {
                 require(it is ValueDataPoint)
@@ -102,6 +103,7 @@ interface InputScope {
 
 fun MotionTestRule<MotionValueToolkit>.goldenTest(
     spec: MotionSpec,
+    createDerived: (underTest: MotionValue) -> List<MotionValue> = { emptyList() },
     initialValue: Float = 0f,
     initialDirection: InputDirection = InputDirection.Max,
     directionChangeSlop: Float = 5f,
@@ -120,11 +122,22 @@ fun MotionTestRule<MotionValueToolkit>.goldenTest(
                 stableThreshold,
                 directionChangeSlop,
                 frameEmitter.asStateFlow(),
+                createDerived,
             )
         val underTest = testHarness.underTest
-        val inspector = underTest.debugInspector()
+        val derived = testHarness.derived
 
-        setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
+        val inspectors = buildMap {
+            put(underTest, underTest.debugInspector())
+            derived.forEach { put(it, it.debugInspector()) }
+        }
+
+        setContent {
+            LaunchedEffect(Unit) {
+                launch { underTest.keepRunning() }
+                derived.forEach { launch { it.keepRunning() } }
+            }
+        }
 
         val recordingJob = launch { testInput.invoke(testHarness) }
 
@@ -132,11 +145,13 @@ fun MotionTestRule<MotionValueToolkit>.goldenTest(
         mainClock.autoAdvance = false
 
         val frameIds = mutableListOf<FrameId>()
-        val frameData = mutableListOf<FrameData>()
+        val frameData = mutableMapOf<MotionValue, MutableList<FrameData>>()
 
         fun recordFrame(frameId: TimestampFrameId) {
             frameIds.add(frameId)
-            frameData.add(inspector.frame)
+            inspectors.forEach { (motionValue, inspector) ->
+                frameData.computeIfAbsent(motionValue) { mutableListOf() }.add(inspector.frame)
+            }
         }
 
         val startFrameTime = mainClock.currentTime
@@ -151,20 +166,36 @@ fun MotionTestRule<MotionValueToolkit>.goldenTest(
         val timeSeries =
             TimeSeries(
                 frameIds.toList(),
-                listOf(
-                    Feature("input", frameData.map { it.input.asDataPoint() }),
-                    Feature(
-                        "gestureDirection",
-                        frameData.map { it.gestureDirection.name.asDataPoint() },
-                    ),
-                    Feature("output", frameData.map { it.output.asDataPoint() }),
-                    Feature("outputTarget", frameData.map { it.outputTarget.asDataPoint() }),
-                    Feature("outputSpring", frameData.map { it.springParameters.asDataPoint() }),
-                    Feature("isStable", frameData.map { it.isStable.asDataPoint() }),
-                ),
+                buildList {
+                    frameData.forEach { (motionValue, frames) ->
+                        val prefix = if (motionValue == underTest) "" else "${motionValue.label}-"
+
+                        add(Feature("${prefix}input", frames.map { it.input.asDataPoint() }))
+                        add(
+                            Feature(
+                                "${prefix}gestureDirection",
+                                frames.map { it.gestureDirection.name.asDataPoint() },
+                            )
+                        )
+                        add(Feature("${prefix}output", frames.map { it.output.asDataPoint() }))
+                        add(
+                            Feature(
+                                "${prefix}outputTarget",
+                                frames.map { it.outputTarget.asDataPoint() },
+                            )
+                        )
+                        add(
+                            Feature(
+                                "${prefix}outputSpring",
+                                frames.map { it.springParameters.asDataPoint() },
+                            )
+                        )
+                        add(Feature("${prefix}isStable", frames.map { it.isStable.asDataPoint() }))
+                    }
+                },
             )
 
-        inspector.dispose()
+        inspectors.values.forEach { it.dispose() }
 
         val recordedMotion = create(timeSeries, screenshots = null)
         verifyTimeSeries.invoke(recordedMotion.timeSeries)
@@ -179,6 +210,7 @@ private class MotionValueTestHarness(
     stableThreshold: Float,
     directionChangeSlop: Float,
     val onFrame: StateFlow<Long>,
+    createDerived: (underTest: MotionValue) -> List<MotionValue>,
 ) : InputScope {
 
     override var input by mutableFloatStateOf(initialInput)
@@ -193,6 +225,8 @@ private class MotionValueTestHarness(
             initialSpec = spec,
         )
 
+    val derived = createDerived(underTest)
+
     override fun updateValue(position: Float) {
         input = position
         gestureContext.dragOffset = position
@@ -205,16 +239,19 @@ private class MotionValueTestHarness(
         }
 
     override suspend fun awaitStable() {
-        val debugInspector = underTest.debugInspector()
+        val debugInspectors = buildList {
+            add(underTest.debugInspector())
+            addAll(derived.map { it.debugInspector() })
+        }
         try {
 
             onFrame
                 // Since this is a state-flow, the current frame is counted too.
                 .drop(1)
-                .takeWhile { !debugInspector.frame.isStable }
+                .takeWhile { debugInspectors.any { !it.frame.isStable } }
                 .collect {}
         } finally {
-            debugInspector.dispose()
+            debugInspectors.forEach { it.dispose() }
         }
     }
 

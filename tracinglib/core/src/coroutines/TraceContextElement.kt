@@ -144,6 +144,7 @@ private object PerfettoTraceConfig {
 
     init {
         if (android.os.Flags.perfettoSdkTracingV2()) {
+            PerfettoTrace.register(/* isBackendInProcess */ false)
             COROUTINE_CATEGORY.register()
         }
     }
@@ -285,7 +286,9 @@ internal class TraceContextElement(
 
     init {
         if (usePerfettoSdk) {
-            PerfettoTrace.end(PerfettoTraceConfig.COROUTINE_CATEGORY).addFlow(continuationId).emit()
+            PerfettoTrace.end(PerfettoTraceConfig.COROUTINE_CATEGORY)
+                .setFlow(continuationId.toLong())
+                .emit()
         } else {
             Trace.traceEnd(Trace.TRACE_TAG_APP) // end: "TCE#init"
         }
@@ -320,7 +323,7 @@ internal class TraceContextElement(
                     PerfettoTraceConfig.COROUTINE_CATEGORY,
                     coroutineTraceName + if (continuationCount < 0) "" else continuationCount,
                 )
-                .addTerminatingFlow(continuationId)
+                .setTerminatingFlow(continuationId.toLong())
                 .emit()
             continuationId = nextRandomInt()
         } else {
@@ -370,7 +373,9 @@ internal class TraceContextElement(
         if (storage.data === oldState) return
         val contId = storage.restoreDataForSuspension(oldState)
         if (usePerfettoSdk) {
-            PerfettoTrace.end(PerfettoTraceConfig.COROUTINE_CATEGORY).addFlow(contId).emit()
+            PerfettoTrace.end(PerfettoTraceConfig.COROUTINE_CATEGORY)
+                .setFlow(contId.toLong())
+                .emit()
         } else {
             Trace.traceEnd(Trace.TRACE_TAG_APP) // end: coroutineTraceName
         }
