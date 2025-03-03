@@ -301,6 +301,9 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
     public void setIsDisabled(boolean isDisabled) {
         if (mIsDisabled != isDisabled) {
             mIsDisabled = isDisabled;
+            if (mBadge instanceof FastBitmapDrawable fbd) {
+                fbd.setIsDisabled(isDisabled);
+            }
             updateFilter();
         }
     }

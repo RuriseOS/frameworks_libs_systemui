@@ -27,6 +27,7 @@ import android.graphics.ColorFilter;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
@@ -99,12 +100,12 @@ public class MonochromeIconFactory extends Drawable {
      * Creates a monochrome version of the provided drawable
      */
     @WorkerThread
-    public Drawable wrap(AdaptiveIconDrawable icon) {
+    public Drawable wrap(AdaptiveIconDrawable icon, Path shapePath, Float iconScale) {
         mFlatCanvas.drawColor(Color.BLACK);
         drawDrawable(icon.getBackground());
         drawDrawable(icon.getForeground());
         generateMono();
-        return new ClippedMonoDrawable(this);
+        return new ClippedMonoDrawable(this, shapePath, iconScale);
     }
 
     @WorkerThread

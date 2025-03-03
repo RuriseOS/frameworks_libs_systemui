@@ -129,6 +129,14 @@ flag {
     bug: "334125919"
 }
 
+
+flag {
+    name: "use_preferred_image_editor"
+    namespace: "systemui"
+    description: "Prefer the editor in config_preferredScreenshotEditor if component is present/enabled on the system"
+    bug: "391401141"
+}
+
 flag {
     name: "enable_lpp_squeeze_effect"
     namespace: "systemui"

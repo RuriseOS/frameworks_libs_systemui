@@ -43,6 +43,8 @@ import androidx.compose.ui.node.ObserverModifierNode
 import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastCoerceAtLeast
+import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.fastForEachIndexed
 import com.android.mechanics.MotionValue
 import com.android.mechanics.spec.DirectionalMotionSpec
@@ -352,10 +354,10 @@ private fun DrawScope.drawDirectionalSpec(
         val mapping = spec.mappings[segmentIndex]
         val startBreakpoint = spec.breakpoints[segmentIndex]
         val segmentStart = startBreakpoint.position
-        val fromInput = segmentStart.coerceAtLeast(inputRange.start)
+        val fromInput = segmentStart.fastCoerceAtLeast(inputRange.start)
         val endBreakpoint = spec.breakpoints[segmentIndex + 1]
         val segmentEnd = endBreakpoint.position
-        val toInput = segmentEnd.coerceAtMost(inputRange.endInclusive)
+        val toInput = segmentEnd.fastCoerceAtMost(inputRange.endInclusive)
 
         // TODO add support for functions that are not linear
         val fromY = mapPointInOutputToY(mapping.map(fromInput), outputRange)

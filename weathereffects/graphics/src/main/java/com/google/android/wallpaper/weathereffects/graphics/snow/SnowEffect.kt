@@ -33,6 +33,7 @@ import com.google.android.wallpaper.weathereffects.graphics.utils.MathUtils
 import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.getScale
 import com.google.android.wallpaper.weathereffects.graphics.utils.TimeUtils
 import java.util.concurrent.Executor
+import kotlin.math.abs
 
 /** Defines and generates the rain weather effect animation. */
 class SnowEffect(
@@ -107,16 +108,14 @@ class SnowEffect(
         frameBuffer.close()
         frameBuffer = FrameBuffer(background.width, background.height)
         val newScale = getScale(parallaxMatrix)
-        if (bitmapScale != newScale) {
-            bitmapScale = newScale
-            frameBuffer.setRenderEffect(
-                RenderEffect.createBlurEffect(
-                    BLUR_RADIUS / bitmapScale,
-                    BLUR_RADIUS / bitmapScale,
-                    Shader.TileMode.CLAMP,
-                )
+        bitmapScale = newScale
+        frameBuffer.setRenderEffect(
+            RenderEffect.createBlurEffect(
+                BLUR_RADIUS / bitmapScale,
+                BLUR_RADIUS / bitmapScale,
+                Shader.TileMode.CLAMP,
             )
-        }
+        )
         // GenerateAccumulatedSnow needs foreground for accumulatedSnowShader, and needs frameBuffer
         // which is also changed with background
         generateAccumulatedSnow()
@@ -138,7 +137,8 @@ class SnowEffect(
     override fun setMatrix(matrix: Matrix) {
         val oldScale = bitmapScale
         super.setMatrix(matrix)
-        if (bitmapScale != oldScale) {
+        // Blur radius should change with scale because it decides the fluffiness of snow
+        if (abs(bitmapScale - oldScale) > FLOAT_TOLERANCE) {
             frameBuffer.setRenderEffect(
                 RenderEffect.createBlurEffect(
                     BLUR_RADIUS / bitmapScale,

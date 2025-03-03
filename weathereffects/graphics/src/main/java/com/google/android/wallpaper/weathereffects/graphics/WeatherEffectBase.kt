@@ -138,4 +138,11 @@ abstract class WeatherEffectBase(
             BitmapShader(background, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
         )
     }
+
+    companion object {
+        // When extracting the scale from the parallax matrix, there will be a very small difference
+        // due to floating-point precision.
+        // We use FLOAT_TOLERANCE to avoid triggering actions on these insignificant scale changes.
+        const val FLOAT_TOLERANCE = 0.0001F
+    }
 }

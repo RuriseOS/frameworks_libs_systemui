@@ -20,11 +20,13 @@ package com.android.mechanics
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.TestMonotonicFrameClock
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.internal.R.id.primary
 import com.android.mechanics.spec.BreakpointKey
 import com.android.mechanics.spec.DirectionalMotionSpec
 import com.android.mechanics.spec.Guarantee
@@ -36,11 +38,13 @@ import com.android.mechanics.spec.reverseBuilder
 import com.android.mechanics.testing.DefaultSprings.matStandardDefault
 import com.android.mechanics.testing.DefaultSprings.matStandardFast
 import com.android.mechanics.testing.MotionValueToolkit
+import com.android.mechanics.testing.MotionValueToolkit.Companion.dataPoints
 import com.android.mechanics.testing.MotionValueToolkit.Companion.input
 import com.android.mechanics.testing.MotionValueToolkit.Companion.isStable
 import com.android.mechanics.testing.MotionValueToolkit.Companion.output
 import com.android.mechanics.testing.goldenTest
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -336,8 +340,48 @@ class MotionValueTest {
     }
 
     @Test
+    fun derivedValue_reflectsInputChangeInSameFrame() {
+        motion.goldenTest(
+            spec = specBuilder(Mapping.Zero).toBreakpoint(0.5f).completeWith(Mapping.One),
+            createDerived = { primary ->
+                listOf(MotionValue.createDerived(primary, MotionSpec.Empty, label = "derived"))
+            },
+            verifyTimeSeries = {
+                // the output of the derived value must match the primary value
+                assertThat(output)
+                    .containsExactlyElementsIn(dataPoints<Float>("derived-output"))
+                    .inOrder()
+                // and its never animated.
+                assertThat(dataPoints<Float>("derived-isStable")).doesNotContain(false)
+            },
+        ) {
+            animateValueTo(1f, changePerFrame = 0.1f)
+            awaitStable()
+        }
+    }
+
+    @Test
+    fun derivedValue_hasAnimationLifecycleOnItsOwn() {
+        motion.goldenTest(
+            spec = specBuilder(Mapping.Zero).toBreakpoint(0.5f).completeWith(Mapping.One),
+            createDerived = { primary ->
+                listOf(
+                    MotionValue.createDerived(
+                        primary,
+                        specBuilder(Mapping.One).toBreakpoint(0.5f).completeWith(Mapping.Zero),
+                        label = "derived",
+                    )
+                )
+            },
+        ) {
+            animateValueTo(1f, changePerFrame = 0.1f)
+            awaitStable()
+        }
+    }
+
+    @Test
     fun keepRunning_concurrentInvocationThrows() = runTestWithFrameClock { testScheduler, _ ->
-        val underTest = MotionValue({ 1f }, FakeGestureContext)
+        val underTest = MotionValue({ 1f }, FakeGestureContext, label = "Foo")
         val realJob = launch { underTest.keepRunning() }
         testScheduler.runCurrent()
 
@@ -347,7 +391,7 @@ class MotionValueTest {
             // keepRunning returns Nothing, will never get here
         } catch (e: Throwable) {
             assertThat(e).isInstanceOf(IllegalStateException::class.java)
-            assertThat(e).hasMessageThat().contains("keepRunning() invoked while already running")
+            assertThat(e).hasMessageThat().contains("MotionValue(Foo) is already running")
         }
         assertThat(realJob.isActive).isTrue()
         realJob.cancel()
@@ -386,12 +430,20 @@ class MotionValueTest {
         // Produces the frame..
         assertThat(framesCount).isEqualTo(1)
         // ... and is suspended again.
+        assertThat(inspector.isAnimating).isTrue()
+
+        rule.mainClock.advanceTimeByFrame()
+        rule.awaitIdle()
+
+        // Produces the frame..
+        assertThat(framesCount).isEqualTo(2)
+        // ... and is suspended again.
         assertThat(inspector.isAnimating).isFalse()
 
         rule.mainClock.autoAdvance = true
         rule.awaitIdle()
         // Ensure that no more frames are produced
-        assertThat(framesCount).isEqualTo(1)
+        assertThat(framesCount).isEqualTo(2)
     }
 
     @Test
@@ -447,10 +499,38 @@ class MotionValueTest {
 
         rule.awaitIdle()
 
-        // Stabilizing the spring during awaitIdle() took 176ms (obtained from looking at reference
+        // Stabilizing the spring during awaitIdle() took 160ms (obtained from looking at reference
         // test runs). That time is expected to be 100% reproducible, given the starting
         // state/configuration of the spring before awaitIdle().
-        assertThat(rule.mainClock.currentTime).isEqualTo(timeBeforeAutoAdvance + 176)
+        assertThat(rule.mainClock.currentTime).isEqualTo(timeBeforeAutoAdvance + 160)
+    }
+
+    @Test
+    fun keepRunningWhile_stopRunningWhileStable_endsImmediately() = runTest {
+        val input = mutableFloatStateOf(0f)
+        val spec = specBuilder(Mapping.Zero).toBreakpoint(1f).completeWith(Mapping.One)
+        val underTest = MotionValue(input::value, FakeGestureContext, spec)
+
+        val continueRunning = mutableStateOf(true)
+
+        rule.setContent {
+            LaunchedEffect(Unit) { underTest.keepRunningWhile { continueRunning.value } }
+        }
+
+        val inspector = underTest.debugInspector()
+
+        rule.awaitIdle()
+
+        assertWithMessage("isActive").that(inspector.isActive).isTrue()
+        assertWithMessage("isAnimating").that(inspector.isAnimating).isFalse()
+
+        val timeBeforeStopRunning = rule.mainClock.currentTime
+        continueRunning.value = false
+        rule.awaitIdle()
+
+        assertWithMessage("isActive").that(inspector.isActive).isFalse()
+        assertWithMessage("isAnimating").that(inspector.isAnimating).isFalse()
+        assertThat(rule.mainClock.currentTime).isEqualTo(timeBeforeStopRunning)
     }
 
     @Test
