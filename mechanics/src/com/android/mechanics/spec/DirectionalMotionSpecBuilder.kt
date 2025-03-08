@@ -417,18 +417,25 @@ private class DirectionalMotionSpecBuilderImpl(override val defaultSpring: Sprin
             check(!sourceValue.isNaN())
 
             val sourcePosition = breakpoints.last().position
+            val breakpointDistance = atPosition - sourcePosition
+            val mapping =
+                if (breakpointDistance == 0f) {
+                    Mapping.Fixed(sourceValue)
+                } else {
 
-            if (fractionalMapping.isNaN()) {
-                val delta = targetValue - sourceValue
-                fractionalMapping = delta / (atPosition - sourcePosition)
-            } else {
-                val delta = (atPosition - sourcePosition) * fractionalMapping
-                targetValue = sourceValue + delta
-            }
+                    if (fractionalMapping.isNaN()) {
+                        val delta = targetValue - sourceValue
+                        fractionalMapping = delta / (atPosition - sourcePosition)
+                    } else {
+                        val delta = (atPosition - sourcePosition) * fractionalMapping
+                        targetValue = sourceValue + delta
+                    }
 
-            val offset = sourceValue - (sourcePosition * fractionalMapping)
+                    val offset = sourceValue - (sourcePosition * fractionalMapping)
+                    Mapping.Linear(fractionalMapping, offset)
+                }
 
-            mappings.add(Mapping.Linear(fractionalMapping, offset))
+            mappings.add(mapping)
             targetValue = Float.NaN
             sourceValue = Float.NaN
             fractionalMapping = Float.NaN

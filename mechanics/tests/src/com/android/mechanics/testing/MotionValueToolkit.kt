@@ -98,7 +98,14 @@ interface InputScope {
         changePerFrame: Float = abs(input - targetValue) / 5f,
     )
 
+    suspend fun animatedInputSequence(vararg values: Float)
+
     fun reset(position: Float, direction: InputDirection)
+}
+
+enum class VerifyTimeSeriesResult {
+    SkipGoldenVerification,
+    AssertTimeSeriesMatchesGolden,
 }
 
 fun MotionTestRule<MotionValueToolkit>.goldenTest(
@@ -108,7 +115,9 @@ fun MotionTestRule<MotionValueToolkit>.goldenTest(
     initialDirection: InputDirection = InputDirection.Max,
     directionChangeSlop: Float = 5f,
     stableThreshold: Float = 0.01f,
-    verifyTimeSeries: TimeSeries.() -> Unit = {},
+    verifyTimeSeries: TimeSeries.() -> VerifyTimeSeriesResult = {
+        VerifyTimeSeriesResult.AssertTimeSeriesMatchesGolden
+    },
     testInput: suspend InputScope.() -> Unit,
 ) = runTest {
     with(toolkit.composeTestRule) {
@@ -198,8 +207,10 @@ fun MotionTestRule<MotionValueToolkit>.goldenTest(
         inspectors.values.forEach { it.dispose() }
 
         val recordedMotion = create(timeSeries, screenshots = null)
-        verifyTimeSeries.invoke(recordedMotion.timeSeries)
-        assertThat(recordedMotion).timeSeriesMatchesGolden()
+        val skipGoldenVerification = verifyTimeSeries.invoke(recordedMotion.timeSeries)
+        if (skipGoldenVerification == VerifyTimeSeriesResult.AssertTimeSeriesMatchesGolden) {
+            assertThat(recordedMotion).timeSeriesMatchesGolden()
+        }
     }
 }
 
@@ -278,6 +289,13 @@ private class MotionValueTestHarness(
 
         updateValue(targetValue)
         awaitFrames()
+    }
+
+    override suspend fun animatedInputSequence(vararg values: Float) {
+        values.forEach {
+            updateValue(it)
+            awaitFrames()
+        }
     }
 
     override fun reset(position: Float, direction: InputDirection) {

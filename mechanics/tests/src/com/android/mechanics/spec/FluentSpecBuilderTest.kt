@@ -245,6 +245,22 @@ class FluentSpecBuilderTest {
             .matchesLinearMapping(in1 = 5f, out1 = 1f, in2 = 30f, out2 = 20f)
     }
 
+    @Test
+    fun directionalSpec_mappingBuilder_breakpointsAtSamePosition_producesValidSegment() {
+        val result =
+            DirectionalMotionSpec.builder(Spring)
+                .toBreakpoint(5f)
+                .jumpTo(1f)
+                .continueWithTargetValue(target = 20f)
+                .toBreakpoint(5f)
+                .completeWith(Mapping.Identity)
+
+        assertThat(result)
+            .mappings()
+            .containsExactly(Mapping.Identity, Mapping.Fixed(1f), Mapping.Identity)
+            .inOrder()
+    }
+
     companion object {
         val Spring = SpringParameters(stiffness = 100f, dampingRatio = 1f)
         val B1 = BreakpointKey("One")

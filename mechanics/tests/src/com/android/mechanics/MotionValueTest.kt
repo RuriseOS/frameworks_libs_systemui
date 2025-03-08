@@ -18,6 +18,8 @@
 
 package com.android.mechanics
 
+import android.util.Log
+import android.util.Log.TerribleFailureHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +28,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.TestMonotonicFrameClock
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.internal.R.id.primary
 import com.android.mechanics.spec.BreakpointKey
 import com.android.mechanics.spec.DirectionalMotionSpec
 import com.android.mechanics.spec.Guarantee
@@ -42,6 +43,8 @@ import com.android.mechanics.testing.MotionValueToolkit.Companion.dataPoints
 import com.android.mechanics.testing.MotionValueToolkit.Companion.input
 import com.android.mechanics.testing.MotionValueToolkit.Companion.isStable
 import com.android.mechanics.testing.MotionValueToolkit.Companion.output
+import com.android.mechanics.testing.VerifyTimeSeriesResult.AssertTimeSeriesMatchesGolden
+import com.android.mechanics.testing.VerifyTimeSeriesResult.SkipGoldenVerification
 import com.android.mechanics.testing.goldenTest
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -54,6 +57,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 import platform.test.motion.MotionTestRule
 import platform.test.motion.testing.createGoldenPathManager
@@ -65,6 +69,7 @@ class MotionValueTest {
 
     @get:Rule(order = 0) val rule = createComposeRule()
     @get:Rule(order = 1) val motion = MotionTestRule(MotionValueToolkit(rule), goldenPathManager)
+    @get:Rule(order = 2) val wtfLog = WtfLogRule()
 
     @Test
     fun emptySpec_outputMatchesInput_withoutAnimation() =
@@ -75,6 +80,8 @@ class MotionValueTest {
                 assertThat(output).containsExactlyElementsIn(input).inOrder()
                 // There must never be an ongoing animation.
                 assertThat(isStable).doesNotContain(false)
+
+                AssertTimeSeriesMatchesGolden
             },
         ) {
             animateValueTo(100f)
@@ -174,6 +181,27 @@ class MotionValueTest {
                 gestureContext.dragOffset += 0.5f
                 awaitFrames()
             }
+        }
+
+    @Test
+    fun segmentChange_appliesOutputVelocity_atSpringStart() =
+        motion.goldenTest(spec = specBuilder().toBreakpoint(10f).completeWith(Mapping.Fixed(20f))) {
+            animateValueTo(11f, changePerFrame = 3f)
+            awaitStable()
+        }
+
+    @Test
+    fun segmentChange_appliesOutputVelocity_springVelocityIsNotAppliedTwice() =
+        motion.goldenTest(
+            spec =
+                specBuilder()
+                    .toBreakpoint(10f)
+                    .continueWith(Mapping.Linear(factor = 1f, offset = 20f))
+                    .toBreakpoint(20f)
+                    .completeWith(Mapping.Fixed(40f))
+        ) {
+            animateValueTo(21f, changePerFrame = 3f)
+            awaitStable()
         }
 
     @Test
@@ -353,6 +381,8 @@ class MotionValueTest {
                     .inOrder()
                 // and its never animated.
                 assertThat(dataPoints<Float>("derived-isStable")).doesNotContain(false)
+
+                AssertTimeSeriesMatchesGolden
             },
         ) {
             animateValueTo(1f, changePerFrame = 0.1f)
@@ -377,6 +407,75 @@ class MotionValueTest {
             animateValueTo(1f, changePerFrame = 0.1f)
             awaitStable()
         }
+    }
+
+    @Test
+    fun nonFiniteNumbers_producesNaN_recoversOnSubsequentFrames() {
+        motion.goldenTest(
+            spec = specBuilder(Mapping { if (it >= 1f) Float.NaN else 0f }).complete(),
+            verifyTimeSeries = {
+                assertThat(output.drop(1).take(5))
+                    .containsExactlyElementsIn(listOf(0f, Float.NaN, Float.NaN, 0f, 0f))
+                    .inOrder()
+                SkipGoldenVerification
+            },
+        ) {
+            animatedInputSequence(0f, 1f, 1f, 0f, 0f)
+        }
+
+        assertThat(wtfLog.loggedFailures).isEmpty()
+    }
+
+    @Test
+    fun nonFiniteNumbers_segmentChange_skipsAnimation() {
+        motion.goldenTest(
+            spec = MotionSpec.Empty,
+            verifyTimeSeries = {
+                // The mappings produce a non-finite number during a segment change.
+                // The animation thereof is skipped to avoid poisoning the state with non-finite
+                // numbers
+                assertThat(output.drop(1).take(5))
+                    .containsExactlyElementsIn(listOf(0f, 1f, Float.NaN, 0f, 0f))
+                    .inOrder()
+                SkipGoldenVerification
+            },
+        ) {
+            animatedInputSequence(0f, 1f)
+            underTest.spec =
+                specBuilder()
+                    .toBreakpoint(0f)
+                    .completeWith(Mapping { if (it >= 1f) Float.NaN else 0f })
+            awaitFrames()
+
+            animatedInputSequence(0f, 0f)
+        }
+
+        assertThat(wtfLog.loggedFailures).hasSize(1)
+        assertThat(wtfLog.loggedFailures.first()).startsWith("Delta between mappings is undefined")
+    }
+
+    @Test
+    fun nonFiniteNumbers_segmentTraverse_skipsAnimation() {
+        motion.goldenTest(
+            spec =
+                specBuilder(Mapping.Zero)
+                    .toBreakpoint(1f)
+                    .completeWith(Mapping { if (it < 2f) Float.NaN else 2f }),
+            verifyTimeSeries = {
+                // The mappings produce a non-finite number during a breakpoint traversal.
+                // The animation thereof is skipped to avoid poisoning the state with non-finite
+                // numbers
+                assertThat(output.drop(1).take(6))
+                    .containsExactlyElementsIn(listOf(0f, 0f, Float.NaN, Float.NaN, 2f, 2f))
+                    .inOrder()
+                SkipGoldenVerification
+            },
+        ) {
+            animatedInputSequence(0f, 0.5f, 1f, 1.5f, 2f, 3f)
+        }
+        assertThat(wtfLog.loggedFailures).hasSize(1)
+        assertThat(wtfLog.loggedFailures.first())
+            .startsWith("Delta between breakpoints is undefined")
     }
 
     @Test
@@ -560,6 +659,25 @@ class MotionValueTest {
         val testScope: TestScope = this
         withContext(TestMonotonicFrameClock(testScope, FrameDelayNanos)) {
             testBody(testScope.testScheduler, testScope.backgroundScope)
+        }
+    }
+
+    class WtfLogRule : ExternalResource() {
+        val loggedFailures = mutableListOf<String>()
+
+        private lateinit var oldHandler: TerribleFailureHandler
+
+        override fun before() {
+            oldHandler =
+                Log.setWtfHandler { tag, what, _ ->
+                    if (tag == MotionValue.TAG) {
+                        loggedFailures.add(checkNotNull(what.message))
+                    }
+                }
+        }
+
+        override fun after() {
+            Log.setWtfHandler(oldHandler)
         }
     }
 

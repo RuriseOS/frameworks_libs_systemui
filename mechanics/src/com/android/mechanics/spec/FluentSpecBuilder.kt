@@ -305,20 +305,26 @@ private class FluentSpecBuilder<R>(
             check(!sourceValue.isNaN())
 
             val sourcePosition = breakpoints.last().position
+            val breakpointDistance = atPosition - sourcePosition
+            val mapping =
+                if (breakpointDistance == 0f) {
+                    Mapping.Fixed(sourceValue)
+                } else {
+                    if (fractionalMapping.isNaN()) {
+                        val delta = targetValue - sourceValue
+                        fractionalMapping = delta / breakpointDistance
+                    } else {
+                        val delta = breakpointDistance * fractionalMapping
+                        targetValue = sourceValue + delta
+                    }
 
-            if (fractionalMapping.isNaN()) {
-                val delta = targetValue - sourceValue
-                fractionalMapping = delta / (atPosition - sourcePosition)
-            } else {
-                val delta = (atPosition - sourcePosition) * fractionalMapping
-                targetValue = sourceValue + delta
-            }
+                    val offset =
+                        if (buildForward) sourceValue - (sourcePosition * fractionalMapping)
+                        else targetValue - (atPosition * fractionalMapping)
+                    Mapping.Linear(fractionalMapping, offset)
+                }
 
-            val offset =
-                if (buildForward) sourceValue - (sourcePosition * fractionalMapping)
-                else targetValue - (atPosition * fractionalMapping)
-
-            mappings.add(Mapping.Linear(fractionalMapping, offset))
+            mappings.add(mapping)
             targetValue = Float.NaN
             sourceValue = Float.NaN
             fractionalMapping = Float.NaN
