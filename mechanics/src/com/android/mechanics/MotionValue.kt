@@ -16,6 +16,7 @@
 
 package com.android.mechanics
 
+import android.util.Log
 import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.util.fastCoerceAtLeast
 import androidx.compose.ui.util.fastCoerceIn
+import androidx.compose.ui.util.fastIsFinite
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.util.packFloats
 import androidx.compose.ui.util.unpackFloat1
@@ -196,6 +198,13 @@ class MotionValue(
 
             try {
                 debugIsAnimating = true
+
+                // indicates whether withFrameNanos is called continuously (as opposed to being
+                // suspended for an undetermined amount of time in between withFrameNanos).
+                // This is essential after `withFrameNanos` returned: if true at this point,
+                // currentAnimationTimeNanos - lastFrameNanos is the duration of the last frame.
+                var isAnimatingUninterrupted = false
+
                 while (continueRunning.invoke(this@MotionValue)) {
 
                     withFrameNanos { frameTimeNanos ->
@@ -221,6 +230,19 @@ class MotionValue(
                     // while at the same time not already applying the `last*` state (as this would
                     // cause a re-computation if the current state is being read before the next
                     // frame).
+
+                    if (isAnimatingUninterrupted) {
+                        val currentDirectMapped = currentDirectMapped
+                        val lastDirectMapped =
+                            lastSegment.mapping.map(lastInput) - lastAnimation.targetValue
+
+                        val frameDuration =
+                            (currentAnimationTimeNanos - lastFrameTimeNanos) / 1_000_000_000.0
+                        val staticDelta = (currentDirectMapped - lastDirectMapped)
+                        directMappedVelocity = (staticDelta / frameDuration).toFloat()
+                    } else {
+                        directMappedVelocity = 0f
+                    }
 
                     var scheduleNextFrame = !isStable
                     if (capturedSegment != currentSegment) {
@@ -273,6 +295,7 @@ class MotionValue(
                             )
                     }
 
+                    isAnimatingUninterrupted = scheduleNextFrame
                     if (scheduleNextFrame) {
                         continue
                     }
@@ -373,6 +396,11 @@ class MotionValue(
      */
     private var lastAnimation: DiscontinuityAnimation by
         mutableStateOf(DiscontinuityAnimation.None, referentialEqualityPolicy())
+
+    // The change velocity of the `currentDirectMapped`, in `units/sec`. Only non-zero if the
+    // animation loop is processing every frame (while animating or while the input changes
+    // continuously).
+    private var directMappedVelocity: Float = 0f
 
     // ---- Last frame's input and output ----------------------------------------------------------
 
@@ -670,10 +698,23 @@ class MotionValue(
             SegmentChangeType.Direction,
             SegmentChangeType.Spec -> {
                 // Determine the delta in the output, as produced by the old and new mapping.
-                val delta =
-                    currentSegment.mapping.map(currentInput) - lastSegment.mapping.map(currentInput)
+                val currentMapping = currentSegment.mapping.map(currentInput)
+                val lastMapping = lastSegment.mapping.map(currentInput)
+                val delta = currentMapping - lastMapping
 
-                if (delta == 0f) {
+                val deltaIsFinite = delta.fastIsFinite()
+                if (!deltaIsFinite) {
+                    Log.wtf(
+                        TAG,
+                        "Delta between mappings is undefined!\n" +
+                            "  MotionValue: $label\n" +
+                            "  input: $currentInput\n" +
+                            "  lastMapping: $lastMapping (lastSegment: $lastSegment)\n" +
+                            "  currentMapping: $currentMapping (currentSegment: $currentSegment)",
+                    )
+                }
+
+                if (delta == 0f || !deltaIsFinite) {
                     // Nothing new to animate.
                     lastAnimation
                 } else {
@@ -687,7 +728,7 @@ class MotionValue(
                     val newTarget = delta - lastSpringState.displacement
                     DiscontinuityAnimation(
                         newTarget,
-                        SpringState(-newTarget, lastSpringState.velocity),
+                        SpringState(-newTarget, lastSpringState.velocity + directMappedVelocity),
                         springParameters,
                         lastFrameTimeNanos,
                     )
@@ -765,14 +806,28 @@ class MotionValue(
                             )
                         lastAnimationTime = nextBreakpointCrossTime
 
-                        val beforeBreakpoint = mappings[segmentIndex].map(nextBreakpoint.position)
-                        val afterBreakpoint =
-                            mappings[segmentIndex + directionOffset].map(nextBreakpoint.position)
+                        val mappingBefore = mappings[segmentIndex]
+                        val beforeBreakpoint = mappingBefore.map(nextBreakpoint.position)
+                        val mappingAfter = mappings[segmentIndex + directionOffset]
+                        val afterBreakpoint = mappingAfter.map(nextBreakpoint.position)
 
                         val delta = afterBreakpoint - beforeBreakpoint
-                        springTarget += delta
-                        springState = springState.addDisplacement(-delta)
+                        val deltaIsFinite = delta.fastIsFinite()
+                        if (!deltaIsFinite) {
+                            Log.wtf(
+                                TAG,
+                                "Delta between breakpoints is undefined!\n" +
+                                    "  MotionValue: $label\n" +
+                                    "  position: ${nextBreakpoint.position}\n" +
+                                    "  before: $beforeBreakpoint (mapping: $mappingBefore)\n" +
+                                    "  after: $afterBreakpoint (mapping: $mappingAfter)",
+                            )
+                        }
 
+                        if (deltaIsFinite) {
+                            springTarget += delta
+                            springState = springState.nudge(displacementDelta = -delta)
+                        }
                         segmentIndex += directionOffset
                         lastBreakpoint = nextBreakpoint
                         guaranteeState =
@@ -791,6 +846,10 @@ class MotionValue(
 
                                 is Guarantee.None -> GuaranteeState.Inactive
                             }
+                    }
+
+                    if (springState.displacement != 0f) {
+                        springState = springState.nudge(velocityDelta = directMappedVelocity)
                     }
 
                     val tightened =
@@ -828,7 +887,9 @@ class MotionValue(
     }
 
     private val currentDirectMapped: Float
-        get() = currentSegment.mapping.map(currentInput()) - currentAnimation.targetValue
+        get() {
+            return currentSegment.mapping.map(currentInput()) - currentAnimation.targetValue
+        }
 
     private val currentAnimatedDelta: Float
         get() = currentAnimation.targetValue + currentSpringState.displacement

@@ -95,6 +95,10 @@ fun interface Mapping {
 
     /** `f(x) = value` */
     data class Fixed(val value: Float) : Mapping {
+        init {
+            require(value.isFinite())
+        }
+
         override fun map(input: Float): Float {
             return value
         }
@@ -102,12 +106,23 @@ fun interface Mapping {
 
     /** `f(x) = factor*x + offset` */
     data class Linear(val factor: Float, val offset: Float = 0f) : Mapping {
+        init {
+            require(factor.isFinite())
+            require(offset.isFinite())
+        }
+
         override fun map(input: Float): Float {
             return input * factor + offset
         }
     }
 
     data class Tanh(val scaling: Float, val tilt: Float, val offset: Float = 0f) : Mapping {
+
+        init {
+            require(scaling.isFinite())
+            require(tilt.isFinite())
+            require(offset.isFinite())
+        }
 
         override fun map(input: Float): Float {
             return scaling * kotlin.math.tanh((input + offset) / (scaling * tilt))

@@ -51,8 +51,9 @@ value class SpringState(val packedValue: Long) {
         return currentEnergy <= maxStableEnergy
     }
 
-    fun addDisplacement(displacementDelta: Float): SpringState {
-        return SpringState(displacement + displacementDelta, velocity)
+    /** Adds the specified [displacementDelta] and [velocityDelta] to the returned state. */
+    fun nudge(displacementDelta: Float = 0f, velocityDelta: Float = 0f): SpringState {
+        return SpringState(displacement + displacementDelta, velocity + velocityDelta)
     }
 
     override fun toString(): String {

@@ -127,9 +127,9 @@ internal constructor(failureMetadata: FailureMetadata, private val actual: Break
 
     companion object {
         val BreakpointKeys =
-            Correspondence.transforming<Breakpoint, BreakpointKey>({ it?.key }, "key")
+            Correspondence.transforming<Breakpoint, BreakpointKey>({ it.key }, "key")
         val BreakpointPositions =
-            Correspondence.transforming<Breakpoint, Float>({ it?.position }, "position")
+            Correspondence.transforming<Breakpoint, Float>({ it.position }, "position")
 
         /** Returns a factory to be used with [Truth.assertAbout]. */
         val SubjectFactory =
