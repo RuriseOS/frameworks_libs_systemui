@@ -79,7 +79,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> widgetBackground(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 4.0, 5.0, 15.0),
+                /* contrastCurve= */ new ContrastCurve(4.0, 4.0, 5.0, 15.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(clockHour(), clockMinute(), 10.0, TonePolarity.DARKER,
                         false));
@@ -93,7 +93,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> widgetBackground(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 6.5, 10.0, 15.0),
+                /* contrastCurve= */ new ContrastCurve(6.5, 6.5, 10.0, 15.0),
                 /* toneDeltaPair= */ null);
     }
 
@@ -105,7 +105,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> widgetBackground(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 5.0, 70.0, 11.0),
+                /* contrastCurve= */ new ContrastCurve(5.0, 5.0, 70.0, 11.0),
                 /* toneDeltaPair= */ null);
     }
 
@@ -117,7 +117,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> widgetBackground(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 5.0, 70.0, 11.0),
+                /* contrastCurve= */ new ContrastCurve(5.0, 5.0, 70.0, 11.0),
                 /* toneDeltaPair= */ null);
     }
 
@@ -143,7 +143,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> themeApp(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 3.0, 7.0, 10.0),
+                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 7.0, 10.0),
                 /* toneDeltaPair= */ null);
     }
 
@@ -183,7 +183,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ true,
                 /* background= */ (s) -> mMdc.surfaceContainerLow(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 3.0, 7.0, 17.0),
+                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 7.0, 17.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(brandA(), brandB(), 10.0, TonePolarity.NEARER, false));
     }
@@ -196,7 +196,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ true,
                 /* background= */ (s) -> mMdc.surfaceContainerLow(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 3.0, 3.0, 6.0),
+                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 3.0, 6.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(brandB(), brandC(), 10.0, TonePolarity.NEARER, false));
     }
@@ -209,7 +209,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> mMdc.surfaceContainerLow(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 3.0, 4.0, 9.0),
+                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 4.0, 9.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(brandC(), brandD(), 10.0, TonePolarity.NEARER, false));
     }
@@ -222,7 +222,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> mMdc.surfaceContainerLow(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 3.0, 4.0, 13.0),
+                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 4.0, 13.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(brandD(), brandA(), 10.0, TonePolarity.NEARER, false));
     }
@@ -246,10 +246,10 @@ public class CustomDynamicColors {
                 /* name= */ "shade_active",
                 /* palette= */ (s) -> s.primaryPalette,
                 /* tone= */ (s) -> 90.0,
-                /* isBackground= */ false,
+                /* isBackground= */ true,
                 /* background= */ (s) -> underSurface(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 3.0, 4.5, 7.0),
+                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 4.5, 7.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(shadeActive(), shadeInactive(), 30.0, TonePolarity.LIGHTER,
                         false));
@@ -263,7 +263,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> shadeActive(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 4.5, 7.0, 11.0),
+                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(onShadeActive(), onShadeActiveVariant(), 20.0,
                         TonePolarity.NEARER, false));
@@ -277,7 +277,7 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> shadeActive(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 4.5, 7.0, 11.0),
+                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(onShadeActiveVariant(), onShadeActive(), 20.0,
                         TonePolarity.NEARER, false));
@@ -301,10 +301,10 @@ public class CustomDynamicColors {
                 /* name= */ "on_shade_inactive",
                 /* palette= */ (s) -> s.neutralVariantPalette,
                 /* tone= */ (s) -> 90.0,
-                /* isBackground= */ true,
+                /* isBackground= */ false,
                 /* background= */ (s) -> shadeInactive(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 4.5, 7.0, 11.0),
+                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
                 /* toneDeltaPair= */
                 (s) -> new ToneDeltaPair(onShadeInactive(), onShadeInactiveVariant(), 10.0,
                         TonePolarity.NEARER, false));
@@ -318,9 +318,9 @@ public class CustomDynamicColors {
                 /* isBackground= */ false,
                 /* background= */ (s) -> shadeInactive(),
                 /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 4.5, 7.0, 11.0),
+                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
                 /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(onShadeInactiveVariant(), onShadeInactive(), 10.0,
+                (s) -> new ToneDeltaPair(onShadeInactive(), onShadeInactiveVariant(), 10.0,
                         TonePolarity.NEARER, false));
     }
 

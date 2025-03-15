@@ -31,7 +31,6 @@ import java.io.IOException;
 public class GraphicsUtils {
 
     private static final String TAG = "GraphicsUtils";
-    private static final float MASK_SIZE = 100f;
 
     public static Runnable sOnNewBitmapRunnable = () -> { };
 

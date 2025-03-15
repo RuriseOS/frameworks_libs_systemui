@@ -19,8 +19,8 @@ package com.android.mechanics.debug
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.android.mechanics.DiscontinuityAnimation
 import com.android.mechanics.MotionValue
+import com.android.mechanics.impl.DiscontinuityAnimation
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.SegmentData
 import com.android.mechanics.spec.SegmentKey

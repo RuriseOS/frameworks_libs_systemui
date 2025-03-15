@@ -17,6 +17,7 @@
 package com.android.mechanics.behavior
 
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -35,18 +36,71 @@ import androidx.compose.ui.util.lerp
 import kotlin.math.min
 
 /**
+ * Draws the background of a vertically container, and applies clipping to it.
+ *
+ * Intended to be used with a [VerticalExpandContainerSpec] motion.
+ */
+fun Modifier.verticalExpandContainerBackground(
+    backgroundColor: Color,
+    spec: VerticalExpandContainerSpec,
+): Modifier =
+    this.then(
+        if (spec.isFloating) {
+            Modifier.verticalFloatingExpandContainerBackground(backgroundColor, spec)
+        } else {
+            Modifier.verticalEdgeExpandContainerBackground(backgroundColor, spec)
+        }
+    )
+
+/**
+ * Draws the background of an floating container, and applies clipping to it.
+ *
+ * Intended to be used with a [VerticalExpandContainerSpec] motion.
+ */
+internal fun Modifier.verticalFloatingExpandContainerBackground(
+    backgroundColor: Color,
+    spec: VerticalExpandContainerSpec,
+): Modifier =
+    this.drawWithCache {
+        val targetRadiusPx = spec.radius.toPx()
+        val currentRadiusPx = min(targetRadiusPx, min(size.width, size.height) / 2f)
+        val horizontalInset = targetRadiusPx - currentRadiusPx
+        val shapeTopLeft = Offset(horizontalInset, 0f)
+        val shapeSize = Size(size.width - (horizontalInset * 2f), size.height)
+
+        val layer =
+            obtainGraphicsLayer().apply {
+                clip = true
+                setRoundRectOutline(shapeTopLeft, shapeSize, cornerRadius = currentRadiusPx)
+
+                record { drawContent() }
+            }
+
+        onDrawWithContent {
+            drawRoundRect(
+                color = backgroundColor,
+                topLeft = shapeTopLeft,
+                size = shapeSize,
+                cornerRadius = CornerRadius(currentRadiusPx),
+            )
+
+            drawLayer(layer)
+        }
+    }
+
+/**
  * Draws the background of an edge container, and applies clipping to it.
  *
- * Intended to be used with a [EdgeContainerExpansionSpec] motion.
+ * Intended to be used with a [VerticalExpandContainerSpec] motion.
  */
-fun Modifier.edgeContainerExpansionBackground(
+internal fun Modifier.verticalEdgeExpandContainerBackground(
     backgroundColor: Color,
-    spec: EdgeContainerExpansionSpec,
+    spec: VerticalExpandContainerSpec,
 ): Modifier = this.then(EdgeContainerExpansionBackgroundElement(backgroundColor, spec))
 
 internal class EdgeContainerExpansionBackgroundNode(
     var backgroundColor: Color,
-    var spec: EdgeContainerExpansionSpec,
+    var spec: VerticalExpandContainerSpec,
 ) : Modifier.Node(), DrawModifierNode {
 
     private var graphicsLayer: GraphicsLayer? = null
@@ -126,7 +180,7 @@ internal class EdgeContainerExpansionBackgroundNode(
 
 private data class EdgeContainerExpansionBackgroundElement(
     val backgroundColor: Color,
-    val spec: EdgeContainerExpansionSpec,
+    val spec: VerticalExpandContainerSpec,
 ) : ModifierNodeElement<EdgeContainerExpansionBackgroundNode>() {
     override fun create(): EdgeContainerExpansionBackgroundNode =
         EdgeContainerExpansionBackgroundNode(backgroundColor, spec)

@@ -34,19 +34,21 @@ import com.android.mechanics.spec.MotionSpec
 import com.android.mechanics.spec.OnChangeSegmentHandler
 import com.android.mechanics.spec.SegmentData
 import com.android.mechanics.spec.SegmentKey
+import com.android.mechanics.spec.buildDirectionalMotionSpec
 import com.android.mechanics.spec.builder
 import com.android.mechanics.spec.reverseBuilder
 import com.android.mechanics.spring.SpringParameters
 
 /** Motion spec for a vertically expandable container. */
-class EdgeContainerExpansionSpec(
-    val visibleHeight: Dp = Defaults.VisibleHeight,
-    val preDetachRatio: Float = Defaults.PreDetachRatio,
-    val detachHeight: Dp = Defaults.DetachHeight,
-    val attachHeight: Dp = Defaults.AttachHeight,
-    val widthOffset: Dp = Defaults.WidthOffset,
+class VerticalExpandContainerSpec(
+    val isFloating: Boolean,
     val minRadius: Dp = Defaults.MinRadius,
     val radius: Dp = Defaults.Radius,
+    val visibleHeight: Dp = Defaults.VisibleHeight,
+    val preDetachRatio: Float = Defaults.PreDetachRatio,
+    val detachHeight: Dp = if (isFloating) radius * 3 else Defaults.DetachHeight,
+    val attachHeight: Dp = if (isFloating) radius * 2 else Defaults.AttachHeight,
+    val widthOffset: Dp = Defaults.WidthOffset,
     val attachSpring: SpringParameters = Defaults.AttachSpring,
     val detachSpring: SpringParameters = Defaults.DetachSpring,
     val opacitySpring: SpringParameters = Defaults.OpacitySpring,
@@ -99,14 +101,16 @@ class EdgeContainerExpansionSpec(
         density: Density,
     ): MotionSpec {
         return with(density) {
-            MotionSpec.builder(
-                    SpringParameters(motionScheme.defaultSpatialSpec()),
-                    initialMapping = { input ->
+            if (isFloating) {
+                MotionSpec(buildDirectionalMotionSpec(Mapping.Fixed(intrinsicWidth)))
+            } else {
+                MotionSpec(
+                    buildDirectionalMotionSpec({ input ->
                         val fraction = (input / detachHeight.toPx()).fastCoerceIn(0f, 1f)
                         intrinsicWidth - lerp(widthOffset.toPx(), 0f, fraction)
-                    },
+                    })
                 )
-                .complete()
+            }
         }
     }
 

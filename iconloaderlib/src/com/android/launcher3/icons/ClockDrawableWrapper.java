@@ -29,6 +29,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
@@ -283,7 +284,7 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
         @Override
         @TargetApi(Build.VERSION_CODES.TIRAMISU)
         public FastBitmapDrawable newIcon(Context context,
-                @DrawableCreationFlags  int creationFlags) {
+                @DrawableCreationFlags  int creationFlags, Path badgeShape) {
             AnimationInfo info;
             Bitmap bg;
             int themedFgColor;
@@ -308,7 +309,7 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
             ClockIconDrawable.ClockConstantState cs = new ClockIconDrawable.ClockConstantState(
                     this, themedFgColor, boundsOffset, info, bg, bgFilter);
             FastBitmapDrawable d = cs.newDrawable();
-            applyFlags(context, d, creationFlags);
+            applyFlags(context, d, creationFlags, null);
             return d;
         }
 
