@@ -152,6 +152,8 @@ class WeatherEngine(
         userPresenceController.onKeyguardGoingAway()
     }
 
+    override fun onKeyguardAppearing() {}
+
     override fun onOffsetChanged(xOffset: Float, xOffsetStep: Float) {
         // No-op.
     }

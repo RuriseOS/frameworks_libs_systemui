@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.android.app.displaylib
 
-package com.google.android.torus.core.wallpaper.listener
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SmallTest
+import org.junit.runner.RunWith
 
-/** Interface that is used to implement specific wallpaper callbacks related to keyguard events. */
-interface LiveWallpaperKeyguardEventListener {
+@SmallTest
+@RunWith(AndroidJUnit4::class)
+class DisplayRepositoryTest {
 
-    /** Called when the keyguard is going away. */
-    fun onKeyguardGoingAway()
-
-    fun onKeyguardAppearing()
+    // TODO b/401305290 - Move tests from The SystemUI DisplayRepositoryImpl to here.
 }

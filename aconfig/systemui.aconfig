@@ -152,6 +152,21 @@ flag {
 }
 
 flag {
+    name: "smartspace_ui_update"
+    namespace: "systemui"
+    description: "Update Smartspace UI"
+    bug: "389741821"
+}
+
+flag {
+    name: "smartspace_ui_update_resources"
+    namespace: "systemui"
+    description: "Read-only flag for updating resources for Smartspace UI"
+    bug: "389741821"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "smartspace_remoteviews_intent_handler"
     namespace: "systemui"
     description: "Enables Smartspace RemoteViews intent handling on lockscreen"

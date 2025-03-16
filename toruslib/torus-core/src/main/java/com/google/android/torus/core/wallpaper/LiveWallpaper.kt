@@ -53,6 +53,7 @@ abstract class LiveWallpaper : WallpaperService() {
         const val COMMAND_PREVIEW_INFO = "android.wallpaper.previewinfo"
         const val COMMAND_LOCKSCREEN_LAYOUT_CHANGED = "android.wallpaper.lockscreen_layout_changed"
         const val COMMAND_LOCKSCREEN_TAP = "android.wallpaper.lockscreen_tap"
+        const val COMMAND_KEYGUARD_APPEARING = "android.wallpaper.keyguardappearing"
         const val WALLPAPER_FLAG_NOT_FOUND = -1
     }
 
@@ -423,6 +424,9 @@ abstract class LiveWallpaper : WallpaperService() {
                         onLockscreenFocalAreaTap(x, y)
                     }
                 }
+                COMMAND_KEYGUARD_APPEARING -> {
+                    onKeyguardAppearing()
+                }
             }
 
             if (resultRequested) return extras
@@ -472,6 +476,12 @@ abstract class LiveWallpaper : WallpaperService() {
         fun onKeyguardGoingAway() {
             if (wallpaperEngine is LiveWallpaperKeyguardEventListener) {
                 (wallpaperEngine as LiveWallpaperKeyguardEventListener).onKeyguardGoingAway()
+            }
+        }
+
+        fun onKeyguardAppearing() {
+            if (wallpaperEngine is LiveWallpaperKeyguardEventListener) {
+                (wallpaperEngine as LiveWallpaperKeyguardEventListener).onKeyguardAppearing()
             }
         }
 
