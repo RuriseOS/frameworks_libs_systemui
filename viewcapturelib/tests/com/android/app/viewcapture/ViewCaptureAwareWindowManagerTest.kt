@@ -17,69 +17,42 @@
 package com.android.app.viewcapture
 
 import android.content.Context
+import android.content.Intent
 import android.testing.AndroidTestingRunner
-import android.view.View
 import android.view.WindowManager
-import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.filters.SmallTest
-import org.junit.Before
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.doAnswer
-import org.mockito.Mockito.spy
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
-import org.mockito.invocation.InvocationOnMock
-import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.mock
 
 @RunWith(AndroidTestingRunner::class)
 @SmallTest
 class ViewCaptureAwareWindowManagerTest {
-    private val context: Context = ApplicationProvider.getApplicationContext()
-    private val mockRootView = mock<View>()
-    private val windowManager = mock<WindowManager>()
-    private val viewCaptureSpy = spy(ViewCaptureFactory.getInstance(context))
-    private val lazyViewCapture = mock<Lazy<ViewCapture>> { on { value } doReturn viewCaptureSpy }
-    private var mViewCaptureAwareWindowManager: ViewCaptureAwareWindowManager? = null
+    private val mContext: Context = InstrumentationRegistry.getInstrumentation().context
+    private lateinit var mViewCaptureAwareWindowManager: ViewCaptureAwareWindowManager
 
-    @Before
-    fun setUp() {
-        doAnswer { invocation: InvocationOnMock ->
-                val view = invocation.getArgument<View>(0)
-                val lp = invocation.getArgument<WindowManager.LayoutParams>(1)
-                view.layoutParams = lp
-                null
-            }
-            .`when`(windowManager)
-            .addView(any(View::class.java), any(WindowManager.LayoutParams::class.java))
-        `when`(mockRootView.context).thenReturn(context)
-    }
+    private val activityIntent = Intent(mContext, TestActivity::class.java)
+
+    @get:Rule val activityScenarioRule = ActivityScenarioRule<TestActivity>(activityIntent)
 
     @Test
-    fun testAddView_viewCaptureEnabled_verifyStartCaptureCall() {
-        mViewCaptureAwareWindowManager =
-            ViewCaptureAwareWindowManager(
-                windowManager,
-                lazyViewCapture,
-                isViewCaptureEnabled = true
-            )
-        mViewCaptureAwareWindowManager?.addView(mockRootView, mockRootView.layoutParams)
-        verify(viewCaptureSpy).startCapture(any(), anyString())
-    }
+    fun testAddView_verifyStartCaptureCall() {
+        activityScenarioRule.scenario.onActivity { activity ->
+            mViewCaptureAwareWindowManager = ViewCaptureAwareWindowManager(mContext)
 
-    @Test
-    fun testAddView_viewCaptureNotEnabled_verifyStartCaptureCall() {
-        mViewCaptureAwareWindowManager =
-            ViewCaptureAwareWindowManager(
-                windowManager,
-                lazyViewCapture,
-                isViewCaptureEnabled = false
+            val activityDecorView = activity.window.decorView
+            // removing view since it is already added to view hierarchy on declaration
+            mViewCaptureAwareWindowManager.removeView(activityDecorView)
+            val viewCapture = ViewCaptureFactory.getInstance(mContext)
+
+            mViewCaptureAwareWindowManager.addView(
+                activityDecorView,
+                activityDecorView.layoutParams as WindowManager.LayoutParams,
             )
-        mViewCaptureAwareWindowManager?.addView(mockRootView, mockRootView.layoutParams)
-        verify(viewCaptureSpy, times(0)).startCapture(any(), anyString())
+            assertTrue(viewCapture.mIsStarted)
+        }
     }
 }

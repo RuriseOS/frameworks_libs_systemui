@@ -464,8 +464,10 @@ constructor(
                 }
             }
 
+            val shouldAddToCache =
+                !(lookupFlags.skipAddToMemCache() && Flags.restoreArchivedAppIconsFromDb())
             // Only add a filled-out entry to the cache
-            if (entryUpdated) {
+            if (entryUpdated && shouldAddToCache) {
                 cache[cacheKey] = entry
             }
         }
