@@ -16,57 +16,51 @@
 
 package com.android.app.viewcapture
 
+import android.content.Context
 import android.media.permission.SafeCloseable
+import android.os.IBinder
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.view.WindowManager
-
-/** Tag for debug logging. */
-private const val TAG = "ViewCaptureWindowManager"
+import android.view.WindowManagerImpl
 
 /**
- * Wrapper class for [WindowManager]. Adds [ViewCapture] to associated window when it is added to
- * view hierarchy.
+ * [WindowManager] implementation to enable view tracing. Adds [ViewCapture] to associated window
+ * when it is added to view hierarchy. Use [ViewCaptureAwareWindowManagerFactory] to create an
+ * instance of this class.
  */
-class ViewCaptureAwareWindowManager(
-    private val windowManager: WindowManager,
-    private val lazyViewCapture: Lazy<ViewCapture>,
-    private val isViewCaptureEnabled: Boolean,
-) : WindowManager by windowManager {
+internal class ViewCaptureAwareWindowManager(
+    private val context: Context,
+    private val parent: Window? = null,
+    private val windowContextToken: IBinder? = null,
+) : WindowManagerImpl(context, parent, windowContextToken) {
 
     private var viewCaptureCloseableMap: MutableMap<View, SafeCloseable> = mutableMapOf()
 
-    override fun addView(view: View, params: ViewGroup.LayoutParams?) {
-        windowManager.addView(view, params)
-        if (isViewCaptureEnabled) {
-            val viewCaptureCloseable: SafeCloseable =
-                lazyViewCapture.value.startCapture(view, getViewName(view))
-            viewCaptureCloseableMap[view] = viewCaptureCloseable
-        }
+    override fun addView(view: View, params: ViewGroup.LayoutParams) {
+        super.addView(view, params)
+        val viewCaptureCloseable: SafeCloseable =
+            ViewCaptureFactory.getInstance(context).startCapture(view, getViewName(view))
+        viewCaptureCloseableMap[view] = viewCaptureCloseable
     }
 
     override fun removeView(view: View?) {
         removeViewFromCloseableMap(view)
-        windowManager.removeView(view)
+        super.removeView(view)
     }
 
     override fun removeViewImmediate(view: View?) {
         removeViewFromCloseableMap(view)
-        windowManager.removeViewImmediate(view)
+        super.removeViewImmediate(view)
     }
 
     private fun getViewName(view: View) = "." + view.javaClass.name
 
     private fun removeViewFromCloseableMap(view: View?) {
-        if (isViewCaptureEnabled) {
-            if (viewCaptureCloseableMap.containsKey(view)) {
-                viewCaptureCloseableMap[view]?.close()
-                viewCaptureCloseableMap.remove(view)
-            }
+        if (viewCaptureCloseableMap.containsKey(view)) {
+            viewCaptureCloseableMap[view]?.close()
+            viewCaptureCloseableMap.remove(view)
         }
-    }
-
-    interface Factory {
-        fun create(windowManager: WindowManager): ViewCaptureAwareWindowManager
     }
 }

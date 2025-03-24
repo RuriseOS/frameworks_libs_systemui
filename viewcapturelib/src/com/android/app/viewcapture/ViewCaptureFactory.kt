@@ -20,7 +20,6 @@ import android.content.Context
 import android.os.Process
 import android.tracing.Flags
 import android.util.Log
-import android.view.WindowManager
 
 /**
  * Factory to create polymorphic instances of ViewCapture according to build configurations and
@@ -67,20 +66,5 @@ object ViewCaptureFactory {
             synchronized(this) { appContext = context.applicationContext }
         }
         return instance
-    }
-
-    /** Returns an instance of [ViewCaptureAwareWindowManager]. */
-    @JvmStatic
-    fun getViewCaptureAwareWindowManagerInstance(
-        context: Context,
-        isViewCaptureTracingEnabled: Boolean,
-    ): ViewCaptureAwareWindowManager {
-        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val lazyViewCapture = lazy { getInstance(context) }
-        return ViewCaptureAwareWindowManager(
-            windowManager,
-            lazyViewCapture,
-            isViewCaptureTracingEnabled,
-        )
     }
 }
