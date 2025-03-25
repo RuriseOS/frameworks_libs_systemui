@@ -84,9 +84,6 @@ public class BaseIconFactory implements AutoCloseable {
     @NonNull
     private final PackageManager mPm;
 
-    @NonNull
-    private final ColorExtractor mColorExtractor;
-
     protected final int mFullResIconDpi;
     protected final int mIconBitmapSize;
 
@@ -115,7 +112,6 @@ public class BaseIconFactory implements AutoCloseable {
         mIconBitmapSize = iconBitmapSize;
 
         mPm = mContext.getPackageManager();
-        mColorExtractor = new ColorExtractor();
 
         mCanvas = new Canvas();
         mCanvas.setDrawFilter(new PaintFlagsDrawFilter(DITHER_FLAG, FILTER_BITMAP_FLAG));
@@ -184,7 +180,7 @@ public class BaseIconFactory implements AutoCloseable {
             icon = createIconBitmap(new BitmapDrawable(mContext.getResources(), icon), 1f);
         }
 
-        return BitmapInfo.of(icon, mColorExtractor.findDominantColorByHue(icon));
+        return BitmapInfo.of(icon, ColorExtractor.findDominantColorByHue(icon));
     }
 
     /**
@@ -230,7 +226,7 @@ public class BaseIconFactory implements AutoCloseable {
                 options == null ? MODE_WITH_SHADOW : options.mGenerationMode);
 
         int color = (options != null && options.mExtractedColor != null)
-                ? options.mExtractedColor : mColorExtractor.findDominantColorByHue(bitmap);
+                ? options.mExtractedColor : ColorExtractor.findDominantColorByHue(bitmap);
         BitmapInfo info = BitmapInfo.of(bitmap, color);
 
         if (adaptiveIcon instanceof Extender extender) {
