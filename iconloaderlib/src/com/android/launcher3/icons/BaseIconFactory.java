@@ -189,10 +189,14 @@ public class BaseIconFactory implements AutoCloseable {
     @NonNull
     public AdaptiveIconDrawable createShapedAdaptiveIcon(Bitmap iconBitmap) {
         Drawable drawable = new FixedSizeBitmapDrawable(iconBitmap);
-        float inset = getExtraInsetFraction();
+        if (getIconScale() < 1f) {
+            drawable = createScaledDrawable(drawable, 1 / getIconScale());
+        }
+        float inset = getExtraInsetFraction() * getIconScale();
         inset = inset / (1 + 2 * inset);
-        return new AdaptiveIconDrawable(new ColorDrawable(Color.BLACK),
-                new InsetDrawable(drawable, inset, inset, inset, inset));
+        return new AdaptiveIconDrawable(new ColorDrawable(BLACK),
+                new InsetDrawable(drawable, inset, inset, inset, inset)
+        );
     }
 
     @NonNull
