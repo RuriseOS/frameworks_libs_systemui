@@ -98,8 +98,6 @@ public class BaseIconFactory implements AutoCloseable {
 
     private static int PLACEHOLDER_BACKGROUND_COLOR = Color.rgb(245, 245, 245);
 
-    private final boolean mShouldForceThemeIcon;
-
     protected BaseIconFactory(Context context, int fullResIconDpi, int iconBitmapSize,
             boolean unused) {
         this(context, fullResIconDpi, iconBitmapSize);
@@ -115,9 +113,6 @@ public class BaseIconFactory implements AutoCloseable {
         mCanvas = new Canvas();
         mCanvas.setDrawFilter(new PaintFlagsDrawFilter(DITHER_FLAG, FILTER_BITMAP_FLAG));
         clear();
-
-        mShouldForceThemeIcon = mContext.getResources().getBoolean(
-                R.bool.enable_forced_themed_icon);
     }
 
     protected void clear() {
@@ -266,13 +261,6 @@ public class BaseIconFactory implements AutoCloseable {
             }
         }
         return op;
-    }
-
-    /**
-     * @return True if forced theme icon is enabled
-     */
-    public boolean shouldForceThemeIcon() {
-        return mShouldForceThemeIcon;
     }
 
     @NonNull
