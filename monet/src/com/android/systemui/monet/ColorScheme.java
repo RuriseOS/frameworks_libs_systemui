@@ -67,6 +67,7 @@ public class ColorScheme {
 
     public ColorScheme(@ColorInt int seed, boolean isDark, @Style.Type int style,
             double contrastLevel) {
+
         this.mSeed = seed;
         this.mIsDark = isDark;
         this.mStyle = style;
