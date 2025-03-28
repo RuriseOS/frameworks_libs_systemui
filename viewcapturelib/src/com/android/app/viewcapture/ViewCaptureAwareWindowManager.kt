@@ -18,12 +18,11 @@ package com.android.app.viewcapture
 
 import android.content.Context
 import android.media.permission.SafeCloseable
-import android.os.IBinder
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
-import android.view.WindowManagerImpl
+import android.view.WindowManagerWrapper
 
 /**
  * [WindowManager] implementation to enable view tracing. Adds [ViewCapture] to associated window
@@ -32,9 +31,8 @@ import android.view.WindowManagerImpl
  */
 internal class ViewCaptureAwareWindowManager(
     private val context: Context,
-    private val parent: Window? = null,
-    private val windowContextToken: IBinder? = null,
-) : WindowManagerImpl(context, parent, windowContextToken) {
+    private val base: WindowManager,
+) : WindowManagerWrapper(base) {
 
     private var viewCaptureCloseableMap: MutableMap<View, SafeCloseable> = mutableMapOf()
 
@@ -53,6 +51,10 @@ internal class ViewCaptureAwareWindowManager(
     override fun removeViewImmediate(view: View?) {
         removeViewFromCloseableMap(view)
         super.removeViewImmediate(view)
+    }
+
+    override fun createLocalWindowManager(parentWindow: Window): WindowManager {
+        return ViewCaptureAwareWindowManager(context, base.createLocalWindowManager(parentWindow))
     }
 
     private fun getViewName(view: View) = "." + view.javaClass.name
