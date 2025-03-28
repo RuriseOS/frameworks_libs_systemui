@@ -62,7 +62,6 @@ class MonoIconThemeController(
                 icon,
                 info,
                 factory.getShapePath(icon, Rect(0, 0, info.icon.width, info.icon.height)),
-                factory.iconScale,
                 sourceHint?.isFileDrawable ?: false,
                 factory.shouldForceThemeIcon(),
             )
@@ -85,16 +84,15 @@ class MonoIconThemeController(
         base: AdaptiveIconDrawable,
         info: BitmapInfo,
         shapePath: Path,
-        iconScale: Float,
         isFileDrawable: Boolean,
         shouldForceThemeIcon: Boolean,
     ): Drawable? {
         val mono = base.monochrome
         if (mono != null) {
-            return ClippedMonoDrawable(mono, shapePath, iconScale)
+            return ClippedMonoDrawable(mono, shapePath)
         }
         if (Flags.forceMonochromeAppIcons() && shouldForceThemeIcon && !isFileDrawable) {
-            return MonochromeIconFactory(info.icon.width).wrap(base, shapePath, iconScale)
+            return MonochromeIconFactory(info.icon.width).wrap(base, shapePath)
         }
         return null
     }
@@ -149,11 +147,8 @@ class MonoIconThemeController(
         return monoDrawable?.let { AdaptiveIconDrawable(ColorDrawable(colors[0]), it) }
     }
 
-    class ClippedMonoDrawable(
-        base: Drawable?,
-        private val shapePath: Path,
-        private val iconScale: Float,
-    ) : InsetDrawable(base, -AdaptiveIconDrawable.getExtraInsetFraction()) {
+    class ClippedMonoDrawable(base: Drawable?, private val shapePath: Path) :
+        InsetDrawable(base, -AdaptiveIconDrawable.getExtraInsetFraction()) {
         // TODO(b/399666950): remove this after launcher icon shapes is fully enabled
         private val mCrop = AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
 
@@ -162,7 +157,6 @@ class MonoIconThemeController(
             val saveCount = canvas.save()
             if (Flags.enableLauncherIconShapes()) {
                 canvas.clipPath(shapePath)
-                canvas.scale(iconScale, iconScale, bounds.width() / 2f, bounds.height() / 2f)
             } else {
                 canvas.clipPath(mCrop.iconMask)
             }
