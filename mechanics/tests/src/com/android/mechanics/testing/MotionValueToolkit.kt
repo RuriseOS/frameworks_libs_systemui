@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class)
 
 package com.android.mechanics.testing
 
@@ -22,18 +22,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import com.android.mechanics.DistanceGestureContext
 import com.android.mechanics.MotionValue
 import com.android.mechanics.debug.FrameData
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.MotionSpec
+import com.android.mechanics.spec.SemanticKey
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sign
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.NonDisposableHandle.dispose
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,38 +44,18 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import platform.test.motion.MotionTestRule
 import platform.test.motion.RecordedMotion.Companion.create
+import platform.test.motion.golden.DataPoint
+import platform.test.motion.golden.DataPointType
 import platform.test.motion.golden.Feature
 import platform.test.motion.golden.FrameId
 import platform.test.motion.golden.TimeSeries
 import platform.test.motion.golden.TimestampFrameId
-import platform.test.motion.golden.ValueDataPoint
 import platform.test.motion.golden.asDataPoint
 
 /** Toolkit to support [MotionValue] motion tests. */
 class MotionValueToolkit(val composeTestRule: ComposeContentTestRule) {
     companion object {
-
-        val TimeSeries.input: List<Float>
-            get() = dataPoints("input")
-
-        val TimeSeries.output: List<Float>
-            get() = dataPoints("output")
-
-        val TimeSeries.outputTarget: List<Float>
-            get() = dataPoints("outputTarget")
-
-        val TimeSeries.isStable: List<Boolean>
-            get() = dataPoints("isStable")
-
         internal const val TAG = "MotionValueToolkit"
-
-        fun <T> TimeSeries.dataPoints(featureName: String): List<T> {
-            @Suppress("UNCHECKED_CAST")
-            return (features[featureName] as Feature<T>).dataPoints.map {
-                require(it is ValueDataPoint)
-                it.value
-            }
-        }
     }
 }
 
@@ -108,9 +87,20 @@ enum class VerifyTimeSeriesResult {
     AssertTimeSeriesMatchesGolden,
 }
 
+class CapturedSemantics<T>(
+    val key: SemanticKey<T>,
+    val dataPointType: DataPointType<T>,
+    val name: String = key.debugLabel,
+) {
+    fun toDataPoint(frameData: FrameData): DataPoint<T> {
+        return dataPointType.makeDataPoint(frameData.semantic(key))
+    }
+}
+
 fun MotionTestRule<MotionValueToolkit>.goldenTest(
     spec: MotionSpec,
     createDerived: (underTest: MotionValue) -> List<MotionValue> = { emptyList() },
+    semantics: List<CapturedSemantics<*>> = emptyList(),
     initialValue: Float = 0f,
     initialDirection: InputDirection = InputDirection.Max,
     directionChangeSlop: Float = 5f,
@@ -200,6 +190,8 @@ fun MotionTestRule<MotionValueToolkit>.goldenTest(
                             )
                         )
                         add(Feature("${prefix}isStable", frames.map { it.isStable.asDataPoint() }))
+
+                        semantics.forEach { add(Feature(it.name, frames.map(it::toDataPoint))) }
                     }
                 },
             )
