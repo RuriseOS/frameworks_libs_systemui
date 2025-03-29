@@ -18,6 +18,7 @@ package com.android.app.displaylib
 
 import android.util.Log
 import android.view.Display
+import android.view.Display.DEFAULT_DISPLAY
 import com.android.app.tracing.coroutines.flow.stateInTraced
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.app.tracing.traceSection
@@ -25,6 +26,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.concurrent.ConcurrentHashMap
+import java.util.function.Consumer
 import javax.inject.Qualifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -103,6 +105,15 @@ interface PerDisplayRepository<T> {
     fun interface InitCallback {
         fun onInit(debugName: String, instance: Any)
     }
+
+    /**
+     * Iterate over all the available displays performing the action on each object of type T.
+     *
+     * @param createIfAbsent If true, create instances of T if they are not already created. If
+     *   false, do not and skip calling action..
+     * @param action The action to perform on each instance.
+     */
+    fun forEach(createIfAbsent: Boolean, action: Consumer<T>)
 }
 
 /** Qualifier for [CoroutineScope] used for displaylib background tasks. */
@@ -229,6 +240,14 @@ constructor(
         return "PerDisplayInstanceRepositoryImpl(" +
             "debugName='$debugName', instances=$perDisplayInstances)"
     }
+
+    override fun forEach(createIfAbsent: Boolean, action: Consumer<T>) {
+        if (createIfAbsent) {
+            allowedDisplays.value.forEach { displayId -> get(displayId)?.let { action.accept(it) } }
+        } else {
+            perDisplayInstances.forEach { (_, instance) -> instance?.let { action.accept(it) } }
+        }
+    }
 }
 
 /**
@@ -247,11 +266,22 @@ class DefaultDisplayOnlyInstanceRepositoryImpl<T>(
     override val debugName: String,
     private val instanceProvider: PerDisplayInstanceProvider<T>,
 ) : PerDisplayRepository<T> {
-    private val lazyDefaultDisplayInstance by lazy {
+    private val lazyDefaultDisplayInstanceDelegate = lazy {
         instanceProvider.createInstance(Display.DEFAULT_DISPLAY)
     }
+    private val lazyDefaultDisplayInstance by lazyDefaultDisplayInstanceDelegate
 
     override fun get(displayId: Int): T? = lazyDefaultDisplayInstance
+
+    override fun forEach(createIfAbsent: Boolean, action: Consumer<T>) {
+        if (createIfAbsent) {
+            get(DEFAULT_DISPLAY)?.let { action.accept(it) }
+        } else {
+            if (lazyDefaultDisplayInstanceDelegate.isInitialized()) {
+                lazyDefaultDisplayInstance?.let { action.accept(it) }
+            }
+        }
+    }
 }
 
 /**
@@ -265,4 +295,8 @@ class DefaultDisplayOnlyInstanceRepositoryImpl<T>(
 class SingleInstanceRepositoryImpl<T>(override val debugName: String, private val instance: T) :
     PerDisplayRepository<T> {
     override fun get(displayId: Int): T? = instance
+
+    override fun forEach(createIfAbsent: Boolean, action: Consumer<T>) {
+        action.accept(instance)
+    }
 }
