@@ -102,9 +102,9 @@ class MonoIconThemeController(
         info: BitmapInfo,
         factory: BaseIconFactory,
         sourceHint: SourceHint,
-    ): ThemedBitmap? {
+    ): ThemedBitmap {
         val icon = info.icon
-        if (data.size != icon.height * icon.width) return null
+        if (data.size != icon.height * icon.width) return ThemedBitmap.NOT_SUPPORTED
 
         var monoBitmap = Bitmap.createBitmap(icon.width, icon.height, ALPHA_8)
         monoBitmap.copyPixelsFromBuffer(ByteBuffer.wrap(data))
