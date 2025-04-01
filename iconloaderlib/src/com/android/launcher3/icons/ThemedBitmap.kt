@@ -28,6 +28,18 @@ interface ThemedBitmap {
     fun newDrawable(info: BitmapInfo, context: Context): FastBitmapDrawable
 
     fun serialize(): ByteArray
+
+    companion object {
+
+        @JvmField
+        /** ThemedBitmap to be used when theming is not supported for a particular bitmap */
+        val NOT_SUPPORTED =
+            object : ThemedBitmap {
+                override fun newDrawable(info: BitmapInfo, context: Context) = info.newIcon(context)
+
+                override fun serialize() = ByteArray(0)
+            }
+    }
 }
 
 interface IconThemeController {
@@ -46,7 +58,7 @@ interface IconThemeController {
         info: BitmapInfo,
         factory: BaseIconFactory,
         sourceHint: SourceHint,
-    ): ThemedBitmap?
+    ): ThemedBitmap
 
     fun createThemedAdaptiveIcon(
         context: Context,
