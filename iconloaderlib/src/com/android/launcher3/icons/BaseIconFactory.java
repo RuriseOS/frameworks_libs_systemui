@@ -29,7 +29,6 @@ import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.DrawableWrapper;
 import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
 import android.os.UserHandle;
@@ -242,7 +241,11 @@ public class BaseIconFactory implements AutoCloseable {
                     )
             );
         }
-        info = info.withFlags(getBitmapFlagOp(options));
+        FlagOp flagOp = getBitmapFlagOp(options);
+        if (adaptiveIcon instanceof WrappedAdaptiveIcon) {
+            flagOp = flagOp.addFlag(BitmapInfo.FLAG_WRAPPED_NON_ADAPTIVE);
+        }
+        info = info.withFlags(flagOp);
         return info;
     }
 
@@ -355,12 +358,11 @@ public class BaseIconFactory implements AutoCloseable {
         if (icon instanceof AdaptiveIconDrawable aid) {
             return aid;
         } else {
-            EmptyWrapper foreground = new EmptyWrapper();
-            AdaptiveIconDrawable dr = new AdaptiveIconDrawable(
-                    new ColorDrawable(mWrapperBackgroundColor), foreground);
-            dr.setBounds(0, 0, 1, 1);
             float scale = new IconNormalizer(mIconBitmapSize).getScale(icon);
-            foreground.setDrawable(createScaledDrawable(icon, scale * LEGACY_ICON_SCALE));
+            AdaptiveIconDrawable dr = new WrappedAdaptiveIcon(
+                    new ColorDrawable(mWrapperBackgroundColor),
+                    createScaledDrawable(icon, scale * LEGACY_ICON_SCALE));
+            dr.setBounds(0, 0, 1, 1);
             return dr;
         }
     }
@@ -659,16 +661,10 @@ public class BaseIconFactory implements AutoCloseable {
         }
     }
 
-    private static class EmptyWrapper extends DrawableWrapper {
+    private static class WrappedAdaptiveIcon extends AdaptiveIconDrawable {
 
-        EmptyWrapper() {
-            super(new ColorDrawable());
-        }
-
-        @Override
-        public ConstantState getConstantState() {
-            Drawable d = getDrawable();
-            return d == null ? null : d.getConstantState();
+        WrappedAdaptiveIcon(Drawable backgroundDrawable, Drawable foregroundDrawable) {
+            super(backgroundDrawable, foregroundDrawable);
         }
     }
 }
