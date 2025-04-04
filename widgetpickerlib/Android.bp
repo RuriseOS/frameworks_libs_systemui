@@ -39,3 +39,16 @@ android_library {
         "widget_picker_dagger_annotations",
     ],
 }
+
+// Data types that are accessible & potentially provided by hosts using the widget picker library
+android_library {
+    name: "widget_picker_shared_data_types",
+    srcs: [
+        "src/com/android/widgetpicker/shared/model/PickableWidget.kt",
+        "src/com/android/widgetpicker/shared/model/WidgetAppIcon.kt",
+        "src/com/android/widgetpicker/shared/model/WidgetAppId.kt",
+        "src/com/android/widgetpicker/shared/model/WidgetId.kt",
+        "src/com/android/widgetpicker/shared/model/WidgetPreview.kt",
+        "src/com/android/widgetpicker/shared/model/WidgetUserProfiles.kt",
+    ],
+}
