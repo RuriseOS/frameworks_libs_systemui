@@ -52,3 +52,20 @@ android_library {
         "src/com/android/widgetpicker/shared/model/WidgetUserProfiles.kt",
     ],
 }
+
+android_library {
+    name: "widget_picker_data_repositories",
+    srcs: [
+        "src/com/android/widgetpicker/data/repository/WidgetAppIconsRepository.kt",
+        "src/com/android/widgetpicker/data/repository/WidgetPreviewRepository.kt",
+        "src/com/android/widgetpicker/data/repository/WidgetRecommendationsRepository.kt",
+        "src/com/android/widgetpicker/data/repository/WidgetsRepository.kt",
+        "src/com/android/widgetpicker/data/repository/WidgetUsersRepository.kt",
+    ],
+    static_libs: [
+        "widget_picker_shared_data_types",
+        "kotlinx_coroutines_android",
+        "kotlinx_coroutines",
+    ],
+
+}
