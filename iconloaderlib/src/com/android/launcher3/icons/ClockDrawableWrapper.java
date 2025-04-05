@@ -16,6 +16,7 @@
 package com.android.launcher3.icons;
 
 import static com.android.launcher3.icons.IconProvider.ATLEAST_T;
+import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -40,6 +41,7 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
 
+import com.android.launcher3.icons.cache.CacheLookupFlag;
 import com.android.launcher3.icons.mono.ThemedIconDrawable;
 
 import java.util.Calendar;
@@ -322,6 +324,11 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
         public BitmapInfo clone() {
             return copyInternalsTo(new ClockBitmapInfo(icon, color, 1 - 2 * boundsOffset, animInfo,
                     mFlattenedBackground, themeData, themeBackground));
+        }
+
+        @Override
+        public CacheLookupFlag getMatchingLookupFlag() {
+            return DEFAULT_LOOKUP_FLAG.withThemeIcon(themeData != null);
         }
     }
 
