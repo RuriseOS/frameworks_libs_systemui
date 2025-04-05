@@ -24,10 +24,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.TestMonotonicFrameClock
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.mechanics.spec.Breakpoint
 import com.android.mechanics.spec.BreakpointKey
 import com.android.mechanics.spec.CanBeLastSegment
 import com.android.mechanics.spec.DirectionalMotionSpec
@@ -36,6 +35,7 @@ import com.android.mechanics.spec.Guarantee
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
+import com.android.mechanics.spec.SegmentKey
 import com.android.mechanics.spec.SemanticKey
 import com.android.mechanics.spec.SemanticValue
 import com.android.mechanics.spec.buildDirectionalMotionSpec
@@ -55,18 +55,15 @@ import com.android.mechanics.testing.isStable
 import com.android.mechanics.testing.output
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestCoroutineScheduler
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 import platform.test.motion.MotionTestRule
+import platform.test.motion.compose.runMonotonicClockTest
 import platform.test.motion.golden.DataPointTypes.string
 import platform.test.motion.testing.createGoldenPathManager
 
@@ -417,6 +414,23 @@ class MotionValueTest {
     }
 
     @Test
+    fun segment_returnsCurrentSegmentKey() {
+        val spec =
+            specBuilder(Mapping.Zero) {
+                constantValue(1f, 1f, key = B1)
+                constantValue(2f, 2f, key = B2)
+            }
+
+        val input = mutableFloatStateOf(1f)
+        val underTest = MotionValue(input::value, FakeGestureContext, spec)
+
+        assertThat(underTest.segmentKey).isEqualTo(SegmentKey(B1, B2, InputDirection.Max))
+        input.floatValue = 2f
+        assertThat(underTest.segmentKey)
+            .isEqualTo(SegmentKey(B2, Breakpoint.maxLimit.key, InputDirection.Max))
+    }
+
+    @Test
     fun derivedValue_reflectsInputChangeInSameFrame() {
         motion.goldenTest(
             spec = specBuilder(Mapping.Zero).toBreakpoint(0.5f).completeWith(Mapping.One),
@@ -528,9 +542,10 @@ class MotionValueTest {
     }
 
     @Test
-    fun keepRunning_concurrentInvocationThrows() = runTestWithFrameClock { testScheduler, _ ->
+    fun keepRunning_concurrentInvocationThrows() = runMonotonicClockTest {
         val underTest = MotionValue({ 1f }, FakeGestureContext, label = "Foo")
         val realJob = launch { underTest.keepRunning() }
+        doOnTearDown { realJob.cancel() }
         testScheduler.runCurrent()
 
         assertThat(realJob.isActive).isTrue()
@@ -542,7 +557,6 @@ class MotionValueTest {
             assertThat(e).hasMessageThat().contains("MotionValue(Foo) is already running")
         }
         assertThat(realJob.isActive).isTrue()
-        realJob.cancel()
     }
 
     @Test
@@ -698,19 +712,6 @@ class MotionValueTest {
         assertThat(underTest.debugInspector()).isNotSameInstanceAs(originalInspector)
     }
 
-    @OptIn(ExperimentalTestApi::class)
-    private fun runTestWithFrameClock(
-        testBody:
-            suspend CoroutineScope.(
-                testScheduler: TestCoroutineScheduler, backgroundScope: CoroutineScope,
-            ) -> Unit
-    ) = runTest {
-        val testScope: TestScope = this
-        withContext(TestMonotonicFrameClock(testScope, FrameDelayNanos)) {
-            testBody(testScope.testScheduler, testScope.backgroundScope)
-        }
-    }
-
     class WtfLogRule : ExternalResource() {
         val loggedFailures = mutableListOf<String>()
 
@@ -741,7 +742,6 @@ class MotionValueTest {
                 override val dragOffset: Float
                     get() = 0f
             }
-        private val FrameDelayNanos: Long = 16_000_000L
 
         fun specBuilder(
             initialMapping: Mapping = Mapping.Identity,
