@@ -37,11 +37,13 @@ public class BitmapInfo {
     public static final int FLAG_INSTANT = 1 << 1;
     public static final int FLAG_CLONE = 1 << 2;
     public static final int FLAG_PRIVATE = 1 << 3;
+    public static final int FLAG_WRAPPED_NON_ADAPTIVE = 1 << 4;
     @IntDef(flag = true, value = {
             FLAG_WORK,
             FLAG_INSTANT,
             FLAG_CLONE,
-            FLAG_PRIVATE
+            FLAG_PRIVATE,
+            FLAG_WRAPPED_NON_ADAPTIVE
     })
     @interface BitmapInfoFlags {}
 

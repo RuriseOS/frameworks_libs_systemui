@@ -571,6 +571,7 @@ constructor(
         }
         entry.bitmap.flags = c.getInt(INDEX_FLAGS)
         entry.bitmap = entry.bitmap.withFlags(getUserFlagOpLocked(cacheKey.user))
+        iconProvider.notifyIconLoaded(entry.bitmap, cacheKey, logic)
         return true
     }
 
