@@ -17,15 +17,12 @@
 package com.android.app.viewcapture
 
 import android.content.Context
-import android.os.IBinder
 import android.os.Trace
 import android.os.Trace.TRACE_TAG_APP
-import android.view.Window
 import android.view.WindowManager
 import java.lang.ref.WeakReference
 import java.util.Collections
 import java.util.WeakHashMap
-
 
 /** Factory to create [Context] specific instances of [ViewCaptureAwareWindowManager]. */
 object ViewCaptureAwareWindowManagerFactory {
@@ -43,19 +40,22 @@ object ViewCaptureAwareWindowManagerFactory {
      * no instance is cached; it creates, caches and returns a new instance.
      */
     @JvmStatic
-    fun getInstance(
-        context: Context,
-        parent: Window? = null,
-        windowContextToken: IBinder? = null,
-    ): WindowManager {
-        Trace.traceCounter(TRACE_TAG_APP,
-            "ViewCaptureAwareWindowManagerFactory#instanceMap.size", instanceMap.size)
+    fun getInstance(context: Context): WindowManager {
+        Trace.traceCounter(
+            TRACE_TAG_APP,
+            "ViewCaptureAwareWindowManagerFactory#instanceMap.size",
+            instanceMap.size,
+        )
 
         val cachedWindowManager = instanceMap[context]?.get()
         if (cachedWindowManager != null) {
             return cachedWindowManager
         } else {
-            val windowManager = ViewCaptureAwareWindowManager(context, parent, windowContextToken)
+            val windowManager =
+                ViewCaptureAwareWindowManager(
+                    context,
+                    context.getSystemService(WindowManager::class.java),
+                )
             instanceMap[context] = WeakReference(windowManager)
             return windowManager
         }
