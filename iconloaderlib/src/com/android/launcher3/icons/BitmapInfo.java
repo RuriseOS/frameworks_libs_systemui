@@ -31,17 +31,21 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.icons.cache.CacheLookupFlag;
 import com.android.launcher3.util.FlagOp;
 
+import java.util.Objects;
+
 public class BitmapInfo {
 
     public static final int FLAG_WORK = 1 << 0;
     public static final int FLAG_INSTANT = 1 << 1;
     public static final int FLAG_CLONE = 1 << 2;
     public static final int FLAG_PRIVATE = 1 << 3;
+    public static final int FLAG_WRAPPED_NON_ADAPTIVE = 1 << 4;
     @IntDef(flag = true, value = {
             FLAG_WORK,
             FLAG_INSTANT,
             FLAG_CLONE,
-            FLAG_PRIVATE
+            FLAG_PRIVATE,
+            FLAG_WRAPPED_NON_ADAPTIVE
     })
     @interface BitmapInfoFlags {}
 
@@ -75,7 +79,7 @@ public class BitmapInfo {
     private BitmapInfo badgeInfo;
 
     public BitmapInfo(@NonNull Bitmap icon, int color) {
-        this.icon = icon;
+        this.icon = Objects.requireNonNull(icon);
         this.color = color;
     }
 

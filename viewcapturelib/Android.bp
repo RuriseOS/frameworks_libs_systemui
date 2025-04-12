@@ -58,6 +58,7 @@ android_test {
         "view_capture",
         "androidx.test.ext.junit",
         "androidx.test.rules",
+        "flag-junit",
         "testables",
         "mockito-kotlin2",
         "mockito-target-extended-minus-junit4",

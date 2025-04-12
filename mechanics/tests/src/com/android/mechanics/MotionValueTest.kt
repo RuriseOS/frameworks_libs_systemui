@@ -210,6 +210,26 @@ class MotionValueTest {
         }
 
     @Test
+    // Regression test for b/409726626
+    fun segmentChange_animationAtRest_doesNotAffectVelocity() =
+        motion.goldenTest(
+            spec =
+                specBuilder(Mapping.Zero)
+                    .toBreakpoint(1f)
+                    .continueWith(Mapping.Fixed(20f))
+                    .toBreakpoint(2f)
+                    .continueWith(Mapping.Fixed(20f))
+                    .toBreakpoint(3f)
+                    .completeWith(Mapping.Fixed(10f)),
+            stableThreshold = 1f,
+        ) {
+            this.updateValue(1.5f)
+            awaitStable()
+            animateValueTo(3f)
+            awaitStable()
+        }
+
+    @Test
     fun specChange_shiftSegmentBackwards_doesNotAnimateWithinSegment_animatesSegmentChange() {
         fun generateSpec(offset: Float) =
             specBuilder(Mapping.Zero)
@@ -545,7 +565,6 @@ class MotionValueTest {
     fun keepRunning_concurrentInvocationThrows() = runMonotonicClockTest {
         val underTest = MotionValue({ 1f }, FakeGestureContext, label = "Foo")
         val realJob = launch { underTest.keepRunning() }
-        doOnTearDown { realJob.cancel() }
         testScheduler.runCurrent()
 
         assertThat(realJob.isActive).isTrue()
@@ -557,6 +576,7 @@ class MotionValueTest {
             assertThat(e).hasMessageThat().contains("MotionValue(Foo) is already running")
         }
         assertThat(realJob.isActive).isTrue()
+        realJob.cancel()
     }
 
     @Test
