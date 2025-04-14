@@ -64,6 +64,8 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
 
     private static boolean sFlagHoverEnabled = false;
 
+    private boolean mAnimationEnabled = true;
+
     protected final Paint mPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     public final BitmapInfo mBitmapInfo;
 
@@ -255,6 +257,10 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
 
     @Override
     protected boolean onStateChange(int[] state) {
+        if (!mAnimationEnabled) {
+            return false;
+        }
+
         boolean isPressed = false;
         boolean isHovered = false;
         for (int s : state) {
@@ -428,6 +434,14 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
 
     public void setHoverScaleEnabledForDisplay(boolean hoverScaleEnabledForDisplay) {
         mHoverScaleEnabledForDisplay = hoverScaleEnabledForDisplay;
+    }
+
+    public boolean isAnimationEnabled() {
+        return mAnimationEnabled;
+    }
+
+    public void setAnimationEnabled(boolean animationEnabled) {
+        mAnimationEnabled = animationEnabled;
     }
 
     public static class FastBitmapConstantState extends ConstantState {
