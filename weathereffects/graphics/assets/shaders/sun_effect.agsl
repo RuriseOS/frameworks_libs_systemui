@@ -30,8 +30,8 @@ uniform mat3 transformMatrixWeather;
 
 #include "shaders/lens_flare.agsl"
 
-const vec2 sunCenter = vec2(0.57, -0.8);
 const vec3 godRaysColor = vec3(1., 0.857, 0.71428);
+const vec2 sunCenter = vec2(0.67, -1.0);
 
 float calculateRay(float angle, float time) {
     /*
@@ -94,16 +94,25 @@ float checkBrightnessGodRaysAtCenter(
 }
 
 vec4 main(float2 fragCoord) {
+    float2 aspectRatioAdj = vec2(1.);
+    if (screenAspectRatio > 1) {
+        aspectRatioAdj.x = screenAspectRatio;
+    } else {
+        aspectRatioAdj.y = 1. / screenAspectRatio;
+    }
     // Apply transform matrix to fragCoord
     float2 adjustedUv = transformPoint(transformMatrixBitmap, fragCoord);
 
     float2 uv = transformPoint(transformMatrixWeather, fragCoord) / screenSize;
     uv -= vec2(0.5, 0.5);
-    uv.y /= screenAspectRatio;
-    vec2 sunVariation = vec2(0.1 * sin(time * 0.3), 0.14 * cos(time * 0.5));
-    sunVariation += 0.1 * (0.5 * sin(time * 0.456) + 0.5) * sunCenter / vec2(1., screenAspectRatio);
-    vec2 sunPos = sunVariation + sunCenter / vec2(1., screenAspectRatio);
-    //TODO(b/375214506): fix the uv position of the sun
+    uv *= aspectRatioAdj;
+    // Random sun variation based on sin/cos signal.
+    vec2 sunVariation = 0.08 * vec2(sin(time * 0.3), cos(time * 0.5));
+    // Variation that moves sun on the same direction than the vector that goes from (0,0)
+    // to sunCenter, but scaling distance.
+    sunVariation += 0.1 * (0.5 * sin(time * 0.456) + 0.5) * sunCenter;
+    vec2 sunPos = sunVariation + sunCenter;
+    sunPos *= aspectRatioAdj;
 
     vec4 colorForeground = foreground.eval(adjustedUv);
     vec4 color = background.eval(adjustedUv);
