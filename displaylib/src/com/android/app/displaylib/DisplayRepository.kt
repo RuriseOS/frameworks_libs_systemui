@@ -86,10 +86,27 @@ interface DisplayRepository {
     /**
      * Given a display ID int, return the corresponding Display object, or null if none exist.
      *
-     * This method is guaranteed to not result in any binder call.
+     * This method will not result in a binder call in most cases. The only exception is if there is
+     * an existing binder call ongoing to get the [Display] instance already. In that case, this
+     * will wait for the end of the binder call.
      */
-    fun getDisplay(displayId: Int): Display? =
+    fun getDisplay(displayId: Int): Display?
+
+    /**
+     * As [getDisplay], but it's always guaranteed to not block on any binder call.
+     *
+     * This might return null if the display id was not mapped to a [Display] object yet.
+     */
+    fun getCachedDisplay(displayId: Int): Display? =
         displays.value.firstOrNull { it.displayId == displayId }
+
+    /**
+     * Returns whether the given displayId is in the set of enabled displays.
+     *
+     * This is guaranteed to not cause a binder call. Use this instead of [getDisplay] (see its docs
+     * for why)
+     */
+    fun containsDisplay(displayId: Int): Boolean = displayIds.value.contains(displayId)
 
     /** Represents a connected display that has not been enabled yet. */
     interface PendingDisplay {
@@ -374,6 +391,24 @@ constructor(
             .filter { it == Display.DEFAULT_DISPLAY }
             .map { defaultDisplay.state == Display.STATE_OFF }
             .distinctUntilChanged()
+
+    override fun getDisplay(displayId: Int): Display? {
+        val cachedDisplay = getCachedDisplay(displayId)
+        if (cachedDisplay != null) return cachedDisplay
+        // cachedDisplay could be null for 2 reasons:
+        // 1. the displayId is being mapped to a display in the background, but the binder call is
+        // not done
+        // 2. the display is not there
+        // In case of option one, let's get it synchronously from display manager to make sure for
+        // this to be consistent.
+        return if (displayIds.value.contains(displayId)) {
+            traceSection("$TAG#getDisplayFallbackToDisplayManager") {
+                getDisplayFromDisplayManager(displayId)
+            }
+        } else {
+            null
+        }
+    }
 
     private fun <T> Flow<T>.debugLog(flowName: String): Flow<T> {
         return if (DEBUG) {
