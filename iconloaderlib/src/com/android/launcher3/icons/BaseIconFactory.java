@@ -526,7 +526,9 @@ public class BaseIconFactory implements AutoCloseable {
             @NonNull AdaptiveIconDrawable drawable,
             @NonNull Path shapePath
     ) {
-        if (!Flags.enableLauncherIconShapes()) {
+        Drawable background = drawable.getBackground();
+        Drawable foreground = drawable.getForeground();
+        if (!Flags.enableLauncherIconShapes() || (background == null && foreground == null)) {
             drawable.draw(canvas);
             return;
         }
