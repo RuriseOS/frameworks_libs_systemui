@@ -55,6 +55,10 @@ object MatrixUtils {
         return matrixValues[0]
     }
 
+    fun getScaleFromMatrixValues(matrixValuesArray: FloatArray): Float {
+        return matrixValuesArray[0]
+    }
+
     /**
      * Calculates the transformation matrix that, when applied to `originMatrix`, results in
      * `targetMatrix`. Current use case: Calculating parallax effect for the homescreen compared
@@ -75,6 +79,53 @@ object MatrixUtils {
         concatMatrix.postConcat(inverseMatrix)
         concatMatrix.getValues(matrixValues)
         return transposeMatrixArray(matrixValues, outArray)
+    }
+
+    /**
+     * Calculates the difference in translation between two transformation matrices, represented as
+     * FloatArrays (`centerCropMatrixValues` and `parallaxMatrixValues`), after scaling
+     * `parallaxMatrixValues` to match the scale of `centerCropMatrixValues`. The resulting
+     * translation difference is then stored in the provided `outArray` as a 3x3 translation matrix
+     * (in column-major order).
+     *
+     * @param centerCropMatrixValues A FloatArray of length 9 representing the reference
+     *   transformation matrix (center-cropped view) in row-major order.
+     * @param parallaxMatrixValues A FloatArray of length 9 representing the transformation matrix
+     *   whose translation difference relative to `centerCropMatrixValues` is to be calculated, also
+     *   in row-major order. This array will be scaled to match the scale of
+     *   `centerCropMatrixValues`.
+     * @param outArray A FloatArray of length 9 to store the resulting 3x3 translation matrix. The
+     *   translation components (deltaX, deltaY) will be placed in the appropriate positions for a
+     *   column-major matrix.
+     */
+    fun calculateTranslationDifference(
+        centerCropMatrixValues: FloatArray,
+        parallaxMatrixValues: FloatArray,
+        outArray: FloatArray,
+    ): FloatArray {
+        val scaleX = centerCropMatrixValues[0] / parallaxMatrixValues[0]
+        val scaleY = centerCropMatrixValues[4] / parallaxMatrixValues[4]
+
+        val scaledParallaxTransX = parallaxMatrixValues[2] * scaleX
+        val scaledParallaxTransY = parallaxMatrixValues[5] * scaleY
+
+        val originTransX = centerCropMatrixValues[2]
+        val originTransY = centerCropMatrixValues[5]
+
+        val deltaTransX = originTransX - scaledParallaxTransX
+        val deltaTransY = originTransY - scaledParallaxTransY
+
+        outArray[0] = 1f
+        outArray[1] = 0f
+        outArray[2] = 0f
+        outArray[3] = 0f
+        outArray[4] = 1f
+        outArray[5] = 0f
+        outArray[6] = deltaTransX
+        outArray[7] = deltaTransY
+        outArray[8] = 1f
+
+        return outArray
     }
 
     // Transpose 3x3 matrix values as a FloatArray[9], write results to outArray
