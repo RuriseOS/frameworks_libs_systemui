@@ -192,7 +192,7 @@ constructor(
     }
 
     override fun get(displayId: Int): T? {
-        if (displayRepository.getDisplay(displayId) == null) {
+        if (!displayRepository.containsDisplay(displayId)) {
             Log.e(TAG, "<$debugName: Display with id $displayId doesn't exist.")
             return null
         }
