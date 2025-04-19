@@ -22,16 +22,17 @@ import com.google.ux.material.libmonet.dynamiccolor.MaterialDynamicColors;
 import com.google.ux.material.libmonet.dynamiccolor.ToneDeltaPair;
 import com.google.ux.material.libmonet.dynamiccolor.TonePolarity;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
 
 public class CustomDynamicColors {
     private final MaterialDynamicColors mMdc;
-    public final Supplier<DynamicColor>[] allColors;
+    public final List<Supplier<DynamicColor>> allColors;
 
-    public CustomDynamicColors(boolean isExtendedFidelity) {
-        this.mMdc = new MaterialDynamicColors(isExtendedFidelity);
-
-        allColors = new Supplier[]{
+    public CustomDynamicColors() {
+        this.mMdc = new MaterialDynamicColors();
+        allColors = Arrays.asList(
                 this::widgetBackground,
                 this::clockHour,
                 this::clockMinute,
@@ -54,297 +55,257 @@ public class CustomDynamicColors {
                 this::onShadeInactiveVariant,
                 this::shadeDisabled,
                 this::overviewBackground
-        };
+        );
     }
 
     // CLOCK COLORS
-
     public DynamicColor widgetBackground() {
-        return new DynamicColor(
-                /* name= */ "widget_background",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 20.0 : 95.0,
-                /* isBackground= */ true,
-                /* background= */ null,
-                /* secondBackground= */ null,
-                /* contrastCurve= */ null,
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("widget_background")
+                .setPalette((s) -> s.secondaryPalette)
+                .setTone((s) -> s.isDark ? 20.0 : 95.0)
+                .setIsBackground(true)
+                .build();
     }
 
     public DynamicColor clockHour() {
-        return new DynamicColor(
-                /* name= */ "clock_hour",
-                /* palette= */ (s) -> s.secondaryPalette,
-                /* tone= */ (s) -> s.isDark ? 60.0 : 30.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> widgetBackground(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(4.0, 4.0, 5.0, 15.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(clockHour(), clockMinute(), 10.0, TonePolarity.DARKER,
-                        false));
+        return new DynamicColor.Builder()
+                .setName("clock_hour")
+                .setPalette((s) -> s.isDark ? s.primaryPalette : s.secondaryPalette)
+                .setTone((s) -> s.isDark ? 80.0 : 30.0)
+                .setIsBackground(false)
+                .setBackground((s) -> widgetBackground())
+                .setContrastCurve((s) -> new ContrastCurve(4.0, 4.0, 5.0, 15.0))
+                .setToneDeltaPair((s) -> new ToneDeltaPair(clockHour(), clockMinute(), 10.0,
+                        TonePolarity.DARKER, ToneDeltaPair.DeltaConstraint.FARTHER))
+                .build();
     }
 
     public DynamicColor clockMinute() {
-        return new DynamicColor(
-                /* name= */ "clock_minute",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 90.0 : 40.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> widgetBackground(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(6.5, 6.5, 10.0, 15.0),
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("clock_minute")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> s.isDark ? 90.0 : 40.0)
+                .setIsBackground(false)
+                .setBackground((s) -> widgetBackground())
+                .setContrastCurve((s) -> new ContrastCurve(6.5, 6.5, 10.0, 15.0))
+                .build();
     }
 
     public DynamicColor clockSecond() {
-        return new DynamicColor(
-                /* name= */ "clock_second",
-                /* palette= */ (s) -> s.tertiaryPalette,
-                /* tone= */ (s) -> s.isDark ? 90.0 : 40.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> widgetBackground(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(5.0, 5.0, 70.0, 11.0),
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("clock_second")
+                .setPalette((s) -> s.tertiaryPalette)
+                .setTone((s) -> s.isDark ? 90.0 : 40.0)
+                .setIsBackground(false)
+                .setBackground((s) -> widgetBackground())
+                .setContrastCurve((s) -> new ContrastCurve(5.0, 5.0, 70.0, 11.0))
+                .build();
     }
 
     public DynamicColor weatherTemp() {
-        return new DynamicColor(
-                /* name= */ "weather_temp",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 80.0 : 55.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> widgetBackground(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(5.0, 5.0, 70.0, 11.0),
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("weather_temp")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> s.isDark ? 80.0 : 40.0)
+                .setIsBackground(false)
+                .setBackground((s) -> widgetBackground())
+                .setContrastCurve((s) -> new ContrastCurve(5.0, 5.0, 70.0, 11.0))
+                .build();
     }
 
     // THEME APP ICONS
-
     public DynamicColor themeApp() {
-        return new DynamicColor(
-                /* name= */ "theme_app",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 30.0 : 90.0, // Adjusted values
-                /* isBackground= */ true,
-                /* background= */ null,
-                /* secondBackground= */ null,
-                /* contrastCurve= */ null,
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("theme_app")
+                .setPalette((s) -> s.isDark ? s.secondaryPalette : s.primaryPalette)
+                .setTone((s) -> s.isDark ? 20.0 : 90.0)
+                .setIsBackground(true)
+                .build();
     }
 
     public DynamicColor onThemeApp() {
-        return new DynamicColor(
-                /* name= */ "on_theme_app",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 80.0 : 40.0, // Adjusted values
-                /* isBackground= */ false,
-                /* background= */ (s) -> themeApp(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 7.0, 10.0),
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("on_theme_app")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> s.isDark ? 80.0 : 30.0)
+                .setIsBackground(false)
+                .setBackground((s) -> themeApp())
+                .setContrastCurve((s) -> new ContrastCurve(3.0, 3.0, 7.0, 10.0))
+                .build();
     }
 
     public DynamicColor themeAppRing() {
-        return new DynamicColor(
-                /* name= */ "theme_app_ring",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> 70.0,
-                /* isBackground= */ true,
-                /* background= */ null,
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 1.0, 1.0, 1.0),
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("theme_app_ring")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> 70.0)
+                .setIsBackground(true)
+                .build();
     }
 
     public DynamicColor themeNotif() {
-        return new DynamicColor(
-                /* name= */ "theme_notif",
-                /* palette= */ (s) -> s.tertiaryPalette,
-                /* tone= */ (s) -> s.isDark ? 90.0 : 80.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> themeAppRing(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 1.0, 1.0, 1.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(themeNotif(), themeAppRing(), 10.0, TonePolarity.NEARER,
-                        false));
+        return new DynamicColor.Builder()
+                .setName("theme_notif")
+                .setPalette((s) -> s.tertiaryPalette)
+                .setTone((s) -> 80.0)
+                .setBackground((s) -> themeAppRing())
+                .setContrastCurve((s) -> new ContrastCurve(1.0, 1.0, 1.0, 1.0))
+                .setToneDeltaPair((s) -> new ToneDeltaPair(themeNotif(), themeAppRing(), 10.0,
+                        TonePolarity.RELATIVE_LIGHTER, ToneDeltaPair.DeltaConstraint.FARTHER))
+                .build();
     }
 
     // SUPER G COLORS
-
     public DynamicColor brandA() {
-        return new DynamicColor(
-                /* name= */ "brand_a",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 80.0 : 40.0,
-                /* isBackground= */ true,
-                /* background= */ (s) -> mMdc.surfaceContainerLow(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 7.0, 17.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(brandA(), brandB(), 10.0, TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("brand_a")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> s.isDark ? 80.0 : 40.0)
+                .setBackground((s) -> mMdc.surfaceContainerLow())
+                .setContrastCurve((s) -> s.isDark ? new ContrastCurve(10.0, 10.0, 12.0, 13.0)
+                        : new ContrastCurve(6.0, 6.0, 9.0, 12.0))
+                .build();
     }
 
     public DynamicColor brandB() {
-        return new DynamicColor(
-                /* name= */ "brand_b",
-                /* palette= */ (s) -> s.secondaryPalette,
-                /* tone= */ (s) -> s.isDark ? 98.0 : 70.0,
-                /* isBackground= */ true,
-                /* background= */ (s) -> mMdc.surfaceContainerLow(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 3.0, 6.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(brandB(), brandC(), 10.0, TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("brand_b")
+                .setPalette((s) -> s.secondaryPalette)
+                .setTone((s) -> s.isDark ? 98.0 : 70.0)
+                .setBackground((s) -> mMdc.surfaceContainerLow())
+                .setContrastCurve((s) -> s.isDark ? new ContrastCurve(16.0, 16.0, 16.5, 17.0)
+                        : new ContrastCurve(2.0, 2.0, 3.0, 4.5))
+                .build();
     }
 
     public DynamicColor brandC() {
-        return new DynamicColor(
-                /* name= */ "brand_c",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> s.isDark ? 60.0 : 50.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> mMdc.surfaceContainerLow(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 4.0, 9.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(brandC(), brandD(), 10.0, TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("brand_c")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> s.isDark ? 60.0 : 50.0)
+                .setBackground((s) -> mMdc.surfaceContainerLow())
+                .setContrastCurve((s) -> s.isDark ? new ContrastCurve(6.0, 6.0, 9.0, 11.0)
+                        : new ContrastCurve(4.0, 4.0, 7.0, 8.0))
+                .build();
     }
 
     public DynamicColor brandD() {
-        return new DynamicColor(
-                /* name= */ "brand_d",
-                /* palette= */ (s) -> s.tertiaryPalette,
-                /* tone= */ (s) -> s.isDark ? 90.0 : 59.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> mMdc.surfaceContainerLow(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 4.0, 13.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(brandD(), brandA(), 10.0, TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("brand_d")
+                .setPalette((s) -> s.tertiaryPalette)
+                .setTone((s) -> s.isDark ? 90.0 : 59.0)
+                .setBackground((s) -> mMdc.surfaceContainerLow())
+                .setContrastCurve((s) -> s.isDark ? new ContrastCurve(13.0, 13.0, 14.0, 15.0)
+                        : new ContrastCurve(3.0, 3.0, 4.5, 6.0))
+                .build();
     }
 
-    // QUICK SETTING TIILES
-
+    // QUICK SETTING TILES
     public DynamicColor underSurface() {
-        return new DynamicColor(
-                /* name= */ "under_surface",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> 0.0,
-                /* isBackground= */ true,
-                /* background= */ null,
-                /* secondBackground= */ null,
-                /* contrastCurve= */ null,
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("under_surface")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> 0.0)
+                .setIsBackground(true)
+                .build();
     }
 
     public DynamicColor shadeActive() {
-        return new DynamicColor(
-                /* name= */ "shade_active",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> 90.0,
-                /* isBackground= */ true,
-                /* background= */ (s) -> underSurface(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(3.0, 3.0, 4.5, 7.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(shadeActive(), shadeInactive(), 30.0, TonePolarity.LIGHTER,
-                        false));
+        return new DynamicColor.Builder()
+                .setName("shade_active")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> 90.0)
+                .setIsBackground(true)
+                .setBackground((s) -> underSurface())
+                .setContrastCurve((s) -> new ContrastCurve(3.0, 3.0, 4.5, 7.0))
+                .setToneDeltaPair((s) -> new ToneDeltaPair(shadeActive(), shadeInactive(), 30.0,
+                        TonePolarity.LIGHTER, ToneDeltaPair.DeltaConstraint.FARTHER))
+                .build();
     }
 
     public DynamicColor onShadeActive() {
-        return new DynamicColor(
-                /* name= */ "on_shade_active",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> 10.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> shadeActive(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(onShadeActive(), onShadeActiveVariant(), 20.0,
-                        TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("on_shade_active")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> 10.0)
+                .setIsBackground(false)
+                .setBackground((s) -> shadeActive())
+                .setContrastCurve((s) -> new ContrastCurve(4.5, 4.5, 7.0, 11.0))
+                .setToneDeltaPair(
+                        (s) -> new ToneDeltaPair(onShadeActive(), onShadeActiveVariant(), 20.0,
+                                TonePolarity.RELATIVE_LIGHTER,
+                                ToneDeltaPair.DeltaConstraint.FARTHER))
+                .build();
     }
 
     public DynamicColor onShadeActiveVariant() {
-        return new DynamicColor(
-                /* name= */ "on_shade_active_variant",
-                /* palette= */ (s) -> s.primaryPalette,
-                /* tone= */ (s) -> 30.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> shadeActive(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(onShadeActiveVariant(), onShadeActive(), 20.0,
-                        TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("on_shade_active_variant")
+                .setPalette((s) -> s.primaryPalette)
+                .setTone((s) -> 30.0)
+                .setIsBackground(false)
+                .setBackground((s) -> shadeActive())
+                .setContrastCurve((s) -> new ContrastCurve(4.5, 4.5, 7.0, 11.0))
+                .build();
     }
 
     public DynamicColor shadeInactive() {
-        return new DynamicColor(
-                /* name= */ "shade_inactive",
-                /* palette= */ (s) -> s.neutralPalette,
-                /* tone= */ (s) -> 20.0,
-                /* isBackground= */ true,
-                /* background= */ (s) -> underSurface(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 1.0, 1.0, 1.0),
-                /* toneDeltaPair= */(s) -> new ToneDeltaPair(shadeInactive(), shadeDisabled(), 15.0,
-                TonePolarity.LIGHTER, false));
+        return new DynamicColor.Builder()
+                .setName("shade_inactive")
+                .setPalette((s) -> s.neutralPalette)
+                .setTone((s) -> 20.0)
+                .setIsBackground(true)
+                .setBackground((s) -> underSurface())
+                .setContrastCurve((s) -> new ContrastCurve(1.0, 1.0, 1.0, 1.0))
+                .setToneDeltaPair((s) -> new ToneDeltaPair(shadeInactive(), shadeDisabled(), 15.0,
+                        TonePolarity.LIGHTER, ToneDeltaPair.DeltaConstraint.FARTHER))
+                .build();
     }
 
     public DynamicColor onShadeInactive() {
-        return new DynamicColor(
-                /* name= */ "on_shade_inactive",
-                /* palette= */ (s) -> s.neutralVariantPalette,
-                /* tone= */ (s) -> 90.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> shadeInactive(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(onShadeInactive(), onShadeInactiveVariant(), 10.0,
-                        TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("on_shade_inactive")
+                .setPalette((s) -> s.neutralVariantPalette)
+                .setTone((s) -> 90.0)
+                .setIsBackground(false)
+                .setBackground((s) -> shadeInactive())
+                .setContrastCurve((s) -> new ContrastCurve(4.5, 4.5, 7.0, 11.0))
+                .setToneDeltaPair(
+                        (s) -> new ToneDeltaPair(onShadeInactive(), onShadeInactiveVariant(), 10.0,
+                                TonePolarity.RELATIVE_LIGHTER,
+                                ToneDeltaPair.DeltaConstraint.FARTHER))
+                .build();
     }
 
     public DynamicColor onShadeInactiveVariant() {
-        return new DynamicColor(
-                /* name= */ "on_shade_inactive_variant",
-                /* palette= */ (s) -> s.neutralVariantPalette,
-                /* tone= */ (s) -> 80.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> shadeInactive(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(4.5, 4.5, 7.0, 11.0),
-                /* toneDeltaPair= */
-                (s) -> new ToneDeltaPair(onShadeInactive(), onShadeInactiveVariant(), 10.0,
-                        TonePolarity.NEARER, false));
+        return new DynamicColor.Builder()
+                .setName("on_shade_inactive_variant")
+                .setPalette((s) -> s.neutralVariantPalette)
+                .setTone((s) -> 80.0)
+                .setIsBackground(false)
+                .setBackground((s) -> shadeInactive())
+                .setContrastCurve((s) -> new ContrastCurve(4.5, 4.5, 7.0, 11.0))
+                .build();
     }
 
     public DynamicColor shadeDisabled() {
-        return new DynamicColor(
-                /* name= */ "shade_disabled",
-                /* palette= */ (s) -> s.neutralPalette,
-                /* tone= */ (s) -> 4.0,
-                /* isBackground= */ false,
-                /* background= */ (s) -> underSurface(),
-                /* secondBackground= */ null,
-                /* contrastCurve= */ new ContrastCurve(1.0, 1.0, 1.0, 1.0),
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("shade_disabled")
+                .setPalette((s) -> s.neutralPalette)
+                .setTone((s) -> 4.0)
+                .setIsBackground(false)
+                .setBackground((s) -> underSurface())
+                .setContrastCurve((s) -> new ContrastCurve(1.0, 1.0, 1.0, 1.0))
+                .build();
     }
 
     public DynamicColor overviewBackground() {
-        return new DynamicColor(
-                /* name= */ "overview_background",
-                /* palette= */ (s) -> s.neutralVariantPalette,
-                /* tone= */ (s) -> s.isDark ? 35.0 : 80.0,
-                /* isBackground= */ true,
-                /* background= */ null,
-                /* secondBackground= */ null,
-                /* contrastCurve= */null,
-                /* toneDeltaPair= */ null);
+        return new DynamicColor.Builder()
+                .setName("overview_background")
+                .setPalette((s) -> s.neutralVariantPalette)
+                .setTone((s) -> s.isDark ? 35.0 : 80.0)
+                .setIsBackground(true)
+                .build();
     }
 }

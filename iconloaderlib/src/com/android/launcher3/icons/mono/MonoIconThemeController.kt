@@ -46,7 +46,8 @@ import java.nio.ByteBuffer
 
 @TargetApi(Build.VERSION_CODES.TIRAMISU)
 class MonoIconThemeController(
-    private val colorProvider: (Context) -> IntArray = ThemedIconDrawable.Companion::getColors
+    private val shouldForceThemeIcon: Boolean = false,
+    private val colorProvider: (Context) -> IntArray = ThemedIconDrawable.Companion::getColors,
 ) : IconThemeController {
 
     override val themeID = "with-theme"
@@ -63,7 +64,7 @@ class MonoIconThemeController(
                 info,
                 factory.getShapePath(icon, Rect(0, 0, info.icon.width, info.icon.height)),
                 sourceHint?.isFileDrawable ?: false,
-                factory.shouldForceThemeIcon(),
+                shouldForceThemeIcon,
             )
         if (mono != null) {
             return MonoThemedBitmap(
