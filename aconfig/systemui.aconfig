@@ -160,16 +160,6 @@ flag {
 }
 
 flag {
-    name: "smartspace_remoteviews_intent_handler"
-    namespace: "systemui"
-    description: "Enables Smartspace RemoteViews intent handling on lockscreen"
-    bug: "399416038"
-    metadata {
-         purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_lpp_assist_invocation_effect"
     namespace: "systemui"
     description: "Enables invocation effect on power button long press for launching assistant"
