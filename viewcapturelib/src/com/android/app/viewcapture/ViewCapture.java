@@ -61,6 +61,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -311,8 +312,10 @@ public abstract class ViewCapture {
 
         private int mFrameIndexBg = -1;
         private boolean mIsFirstFrame = true;
-        private long[] mFrameTimesNanosBg = new long[mMemorySize];
-        private ViewPropertyRef[] mNodesBg = new ViewPropertyRef[mMemorySize];
+        private AtomicReference<long[]> mFrameTimesNanosBg =
+                new AtomicReference<>(new long[mMemorySize]);
+        private AtomicReference<ViewPropertyRef[]> mNodesBg =
+                new AtomicReference<>(new ViewPropertyRef[mMemorySize]);
 
         private boolean mIsActive = true;
         private final Consumer<ViewPropertyRef> mCaptureCallback =
@@ -363,14 +366,25 @@ public abstract class ViewCapture {
         private void copyCleanViewsFromLastFrameBg(ViewPropertyRef start) {
             Trace.beginSection("vc#copyCleanViewsFromLastFrameBg");
 
+            // onTrimMemory() might concurrently modify mFrameTimesNanosBg and mNodesBg (set new
+            // arrays with length = 0). So let's atomically acquire the array references and if any
+            // of the array lengths is 0, then a memory trim has been performed and this method
+            // must do nothing.
+            long[] frameTimesNanosBg = mFrameTimesNanosBg.get();
+            ViewPropertyRef[] nodesBg = mNodesBg.get();
+            if (frameTimesNanosBg.length == 0 || nodesBg.length == 0) {
+                Trace.endSection();
+                return;
+            }
+
             long elapsedRealtimeNanos = start.elapsedRealtimeNanos;
             mFrameIndexBg++;
             if (mFrameIndexBg >= mMemorySize) {
                 mFrameIndexBg = 0;
             }
-            mFrameTimesNanosBg[mFrameIndexBg] = elapsedRealtimeNanos;
+            frameTimesNanosBg[mFrameIndexBg] = elapsedRealtimeNanos;
 
-            ViewPropertyRef recycle = mNodesBg[mFrameIndexBg];
+            ViewPropertyRef recycle = nodesBg[mFrameIndexBg];
 
             ViewPropertyRef resultStart = null;
             ViewPropertyRef resultEnd = null;
@@ -390,7 +404,7 @@ public abstract class ViewCapture {
 
                 ViewPropertyRef copy = null;
                 if (end.childCount < 0) {
-                    copy = findInLastFrame(end.hashCode);
+                    copy = findInLastFrame(nodesBg, end.hashCode);
                     if (copy != null) {
                         copy.transferTo(end);
                     } else {
@@ -437,7 +451,7 @@ public abstract class ViewCapture {
                 }
                 end = end.next;
             }
-            mNodesBg[mFrameIndexBg] = resultStart;
+            nodesBg[mFrameIndexBg] = resultStart;
 
             onCapturedViewPropertiesBg(elapsedRealtimeNanos, name, resultStart);
 
@@ -445,9 +459,9 @@ public abstract class ViewCapture {
         }
 
         @WorkerThread
-        private @Nullable ViewPropertyRef findInLastFrame(int hashCode) {
+        private @Nullable ViewPropertyRef findInLastFrame(ViewPropertyRef[] nodesBg, int hashCode) {
             int lastFrameIndex = (mFrameIndexBg == 0) ? mMemorySize - 1 : mFrameIndexBg - 1;
-            ViewPropertyRef viewPropertyRef = mNodesBg[lastFrameIndex];
+            ViewPropertyRef viewPropertyRef = nodesBg[lastFrameIndex];
             while (viewPropertyRef != null && viewPropertyRef.hashCode != hashCode) {
                 viewPropertyRef = viewPropertyRef.next;
             }
@@ -529,15 +543,18 @@ public abstract class ViewCapture {
 
         @WorkerThread
         private WindowData dumpToProto(ViewIdProvider idProvider, ArrayList<Class> classList) {
+            ViewPropertyRef[] nodesBg = mNodesBg.get();
+            long[] frameTimesNanosBg = mFrameTimesNanosBg.get();
+
             WindowData.Builder builder = WindowData.newBuilder().setTitle(name);
-            int size = (mNodesBg[mMemorySize - 1] == null) ? mFrameIndexBg + 1 : mMemorySize;
+            int size = (nodesBg[mMemorySize - 1] == null) ? mFrameIndexBg + 1 : mMemorySize;
             for (int i = size - 1; i >= 0; i--) {
                 int index = (mMemorySize + mFrameIndexBg - i) % mMemorySize;
                 ViewNode.Builder nodeBuilder = ViewNode.newBuilder();
-                mNodesBg[index].toProto(idProvider, classList, nodeBuilder);
+                nodesBg[index].toProto(idProvider, classList, nodeBuilder);
                 FrameData.Builder frameDataBuilder = FrameData.newBuilder()
                         .setNode(nodeBuilder)
-                        .setTimestamp(mFrameTimesNanosBg[index]);
+                        .setTimestamp(frameTimesNanosBg[index]);
                 builder.addFrameData(frameDataBuilder);
             }
             return builder.build();
@@ -575,8 +592,8 @@ public abstract class ViewCapture {
         @Override
         public void onTrimMemory(int level) {
             if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
-                mNodesBg = new ViewPropertyRef[0];
-                mFrameTimesNanosBg = new long[0];
+                mNodesBg.set(new ViewPropertyRef[0]);
+                mFrameTimesNanosBg.set(new long[0]);
                 if (mRoot != null && mRoot.getContext() != null) {
                     mRoot.getContext().unregisterComponentCallbacks(this);
                 }
