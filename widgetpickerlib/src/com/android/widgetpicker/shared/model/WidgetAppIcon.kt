@@ -16,7 +16,7 @@
 
 package com.android.widgetpicker.shared.model
 
-import android.annotation.DrawableRes
+import androidx.annotation.DrawableRes
 import android.graphics.Bitmap
 
 /**
