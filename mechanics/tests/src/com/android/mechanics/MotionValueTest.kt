@@ -20,17 +20,11 @@ package com.android.mechanics
 
 import android.util.Log
 import android.util.Log.TerribleFailureHandler
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.mechanics.spec.Breakpoint
 import com.android.mechanics.spec.BreakpointKey
-import com.android.mechanics.spec.CanBeLastSegment
 import com.android.mechanics.spec.DirectionalMotionSpec
-import com.android.mechanics.spec.DirectionalMotionSpecBuilder
 import com.android.mechanics.spec.Guarantee
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.Mapping
@@ -40,24 +34,25 @@ import com.android.mechanics.spec.SemanticKey
 import com.android.mechanics.spec.SemanticValue
 import com.android.mechanics.spec.buildDirectionalMotionSpec
 import com.android.mechanics.spec.builder
+import com.android.mechanics.spec.builder.CanBeLastSegment
+import com.android.mechanics.spec.builder.DirectionalBuilderScope
 import com.android.mechanics.spec.reverseBuilder
 import com.android.mechanics.spec.with
 import com.android.mechanics.testing.CapturedSemantics
-import com.android.mechanics.testing.DefaultSprings.matStandardDefault
-import com.android.mechanics.testing.DefaultSprings.matStandardFast
-import com.android.mechanics.testing.MotionValueToolkit
+import com.android.mechanics.testing.ComposeMotionValueToolkit
+import com.android.mechanics.testing.FakeMotionSpecBuilderContext
 import com.android.mechanics.testing.VerifyTimeSeriesResult.AssertTimeSeriesMatchesGolden
 import com.android.mechanics.testing.VerifyTimeSeriesResult.SkipGoldenVerification
+import com.android.mechanics.testing.animateValueTo
+import com.android.mechanics.testing.animatedInputSequence
 import com.android.mechanics.testing.dataPoints
 import com.android.mechanics.testing.goldenTest
 import com.android.mechanics.testing.input
 import com.android.mechanics.testing.isStable
 import com.android.mechanics.testing.output
 import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -72,8 +67,7 @@ class MotionValueTest {
     private val goldenPathManager =
         createGoldenPathManager("frameworks/libs/systemui/mechanics/tests/goldens")
 
-    @get:Rule(order = 0) val rule = createComposeRule()
-    @get:Rule(order = 1) val motion = MotionTestRule(MotionValueToolkit(rule), goldenPathManager)
+    @get:Rule(order = 1) val motion = MotionTestRule(ComposeMotionValueToolkit, goldenPathManager)
     @get:Rule(order = 2) val wtfLog = WtfLogRule()
 
     @Test
@@ -93,7 +87,7 @@ class MotionValueTest {
         }
 
     // TODO the tests should describe the expected values not only in terms of goldens, but
-    // also explicitly in verifyTimeSeries
+    //  also explicitly in verifyTimeSeries
 
     @Test
     fun changingInput_addsAnimationToMapping_becomesStable() =
@@ -105,7 +99,7 @@ class MotionValueTest {
         ) {
             animateValueTo(1.1f, changePerFrame = 0.5f)
             while (underTest.isStable) {
-                updateValue(input + 0.5f)
+                updateInput(input + 0.5f)
                 awaitFrames()
             }
         }
@@ -223,7 +217,7 @@ class MotionValueTest {
                     .completeWith(Mapping.Fixed(10f)),
             stableThreshold = 1f,
         ) {
-            this.updateValue(1.5f)
+            this.updateInput(1.5f)
             awaitStable()
             animateValueTo(3f)
             awaitStable()
@@ -334,7 +328,7 @@ class MotionValueTest {
                     .toBreakpoint(2f)
                     .completeWith(Mapping.Two)
         ) {
-            updateValue(2.5f)
+            updateInput(2.5f)
             awaitStable()
         }
 
@@ -351,7 +345,7 @@ class MotionValueTest {
                     .continueWithConstantValue()
                     .complete()
         ) {
-            updateValue(2.1f)
+            updateInput(2.1f)
             awaitStable()
         }
 
@@ -368,7 +362,7 @@ class MotionValueTest {
             initialDirection = InputDirection.Max,
             directionChangeSlop = 1f,
         ) {
-            updateValue(.5f)
+            updateInput(.5f)
             animateValueTo(0f)
             awaitStable()
         }
@@ -495,7 +489,7 @@ class MotionValueTest {
     @Test
     fun nonFiniteNumbers_producesNaN_recoversOnSubsequentFrames() {
         motion.goldenTest(
-            spec = specBuilder(Mapping { if (it >= 1f) Float.NaN else 0f }).complete(),
+            spec = specBuilder({ if (it >= 1f) Float.NaN else 0f }).complete(),
             verifyTimeSeries = {
                 assertThat(output.drop(1).take(5))
                     .containsExactlyElementsIn(listOf(0f, Float.NaN, Float.NaN, 0f, 0f))
@@ -525,9 +519,7 @@ class MotionValueTest {
         ) {
             animatedInputSequence(0f, 1f)
             underTest.spec =
-                specBuilder()
-                    .toBreakpoint(0f)
-                    .completeWith(Mapping { if (it >= 1f) Float.NaN else 0f })
+                specBuilder().toBreakpoint(0f).completeWith({ if (it >= 1f) Float.NaN else 0f })
             awaitFrames()
 
             animatedInputSequence(0f, 0f)
@@ -543,7 +535,7 @@ class MotionValueTest {
             spec =
                 specBuilder(Mapping.Zero)
                     .toBreakpoint(1f)
-                    .completeWith(Mapping { if (it < 2f) Float.NaN else 2f }),
+                    .completeWith({ if (it < 2f) Float.NaN else 2f }),
             verifyTimeSeries = {
                 // The mappings produce a non-finite number during a breakpoint traversal.
                 // The animation thereof is skipped to avoid poisoning the state with non-finite
@@ -577,142 +569,6 @@ class MotionValueTest {
         }
         assertThat(realJob.isActive).isTrue()
         realJob.cancel()
-    }
-
-    @Test
-    fun keepRunning_suspendsWithoutAnAnimation() = runTest {
-        val input = mutableFloatStateOf(0f)
-        val spec = specBuilder(Mapping.Zero).toBreakpoint(1f).completeWith(Mapping.One)
-        val underTest = MotionValue(input::value, FakeGestureContext, spec)
-        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
-
-        val inspector = underTest.debugInspector()
-        var framesCount = 0
-        backgroundScope.launch { snapshotFlow { inspector.frame }.collect { framesCount++ } }
-
-        rule.awaitIdle()
-        framesCount = 0
-        rule.mainClock.autoAdvance = false
-
-        assertThat(inspector.isActive).isTrue()
-        assertThat(inspector.isAnimating).isFalse()
-
-        // Update the value, but WITHOUT causing an animation
-        input.floatValue = 0.5f
-        rule.awaitIdle()
-
-        // Still on the old frame..
-        assertThat(framesCount).isEqualTo(0)
-        // ... [underTest] is now waiting for an animation frame
-        assertThat(inspector.isAnimating).isTrue()
-
-        rule.mainClock.advanceTimeByFrame()
-        rule.awaitIdle()
-
-        // Produces the frame..
-        assertThat(framesCount).isEqualTo(1)
-        // ... and is suspended again.
-        assertThat(inspector.isAnimating).isTrue()
-
-        rule.mainClock.advanceTimeByFrame()
-        rule.awaitIdle()
-
-        // Produces the frame..
-        assertThat(framesCount).isEqualTo(2)
-        // ... and is suspended again.
-        assertThat(inspector.isAnimating).isFalse()
-
-        rule.mainClock.autoAdvance = true
-        rule.awaitIdle()
-        // Ensure that no more frames are produced
-        assertThat(framesCount).isEqualTo(2)
-    }
-
-    @Test
-    fun keepRunning_remainsActiveWhileAnimating() = runTest {
-        val input = mutableFloatStateOf(0f)
-        val spec = specBuilder(Mapping.Zero).toBreakpoint(1f).completeWith(Mapping.One)
-        val underTest = MotionValue(input::value, FakeGestureContext, spec)
-        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
-
-        val inspector = underTest.debugInspector()
-        var framesCount = 0
-        backgroundScope.launch { snapshotFlow { inspector.frame }.collect { framesCount++ } }
-
-        rule.awaitIdle()
-        framesCount = 0
-        rule.mainClock.autoAdvance = false
-
-        assertThat(inspector.isActive).isTrue()
-        assertThat(inspector.isAnimating).isFalse()
-
-        // Update the value, WITH triggering an animation
-        input.floatValue = 1.5f
-        rule.awaitIdle()
-
-        // Still on the old frame..
-        assertThat(framesCount).isEqualTo(0)
-        // ... [underTest] is now waiting for an animation frame
-        assertThat(inspector.isAnimating).isTrue()
-
-        // A couple frames should be generated without pausing
-        repeat(5) {
-            rule.mainClock.advanceTimeByFrame()
-            rule.awaitIdle()
-
-            // The spring is still settling...
-            assertThat(inspector.frame.isStable).isFalse()
-            // ... animation keeps going ...
-            assertThat(inspector.isAnimating).isTrue()
-            // ... and frames are produces...
-            assertThat(framesCount).isEqualTo(it + 1)
-        }
-
-        val timeBeforeAutoAdvance = rule.mainClock.currentTime
-
-        // But this will stop as soon as the animation is finished. Skip forward.
-        rule.mainClock.autoAdvance = true
-        rule.awaitIdle()
-
-        // At which point the spring is stable again...
-        assertThat(inspector.frame.isStable).isTrue()
-        // ... and animations are suspended again.
-        assertThat(inspector.isAnimating).isFalse()
-
-        rule.awaitIdle()
-
-        // Stabilizing the spring during awaitIdle() took 160ms (obtained from looking at reference
-        // test runs). That time is expected to be 100% reproducible, given the starting
-        // state/configuration of the spring before awaitIdle().
-        assertThat(rule.mainClock.currentTime).isEqualTo(timeBeforeAutoAdvance + 160)
-    }
-
-    @Test
-    fun keepRunningWhile_stopRunningWhileStable_endsImmediately() = runTest {
-        val input = mutableFloatStateOf(0f)
-        val spec = specBuilder(Mapping.Zero).toBreakpoint(1f).completeWith(Mapping.One)
-        val underTest = MotionValue(input::value, FakeGestureContext, spec)
-
-        val continueRunning = mutableStateOf(true)
-
-        rule.setContent {
-            LaunchedEffect(Unit) { underTest.keepRunningWhile { continueRunning.value } }
-        }
-
-        val inspector = underTest.debugInspector()
-
-        rule.awaitIdle()
-
-        assertWithMessage("isActive").that(inspector.isActive).isTrue()
-        assertWithMessage("isAnimating").that(inspector.isAnimating).isFalse()
-
-        val timeBeforeStopRunning = rule.mainClock.currentTime
-        continueRunning.value = false
-        rule.awaitIdle()
-
-        assertWithMessage("isActive").that(inspector.isActive).isFalse()
-        assertWithMessage("isAnimating").that(inspector.isAnimating).isFalse()
-        assertThat(rule.mainClock.currentTime).isEqualTo(timeBeforeStopRunning)
     }
 
     @Test
@@ -763,33 +619,35 @@ class MotionValueTest {
                     get() = 0f
             }
 
+        private val Springs = FakeMotionSpecBuilderContext.Default.spatial
+
         fun specBuilder(
             initialMapping: Mapping = Mapping.Identity,
             semantics: List<SemanticValue<*>> = emptyList(),
-            init: DirectionalMotionSpecBuilder.() -> CanBeLastSegment,
+            init: DirectionalBuilderScope.() -> CanBeLastSegment,
         ): MotionSpec {
             return MotionSpec(
-                buildDirectionalMotionSpec(matStandardDefault, initialMapping, semantics, init),
-                resetSpring = matStandardFast,
+                buildDirectionalMotionSpec(Springs.default, initialMapping, semantics, init),
+                resetSpring = Springs.fast,
             )
         }
 
         fun specBuilder(firstSegment: Mapping = Mapping.Identity) =
             MotionSpec.builder(
-                defaultSpring = matStandardDefault,
-                resetSpring = matStandardFast,
+                defaultSpring = Springs.default,
+                resetSpring = Springs.fast,
                 initialMapping = firstSegment,
             )
 
         fun forwardSpecBuilder(firstSegment: Mapping = Mapping.Identity) =
             DirectionalMotionSpec.builder(
-                defaultSpring = matStandardDefault,
+                defaultSpring = Springs.default,
                 initialMapping = firstSegment,
             )
 
         fun reverseSpecBuilder(firstSegment: Mapping = Mapping.Identity) =
             DirectionalMotionSpec.reverseBuilder(
-                defaultSpring = matStandardDefault,
+                defaultSpring = Springs.default,
                 initialMapping = firstSegment,
             )
     }
