@@ -21,14 +21,15 @@ import android.net.Uri
 
 object WallpaperInfoContract {
 
-    /** Returns a [Uri.Builder] for updating a wallpaper. This will produce a uri starts with
-     * content://com.google.android.wallpaper.weathereffects.effectprovider/update_wallpaper.
-     * Append parameters such as foreground and background images, etc.
+    /**
+     * Returns a [Uri.Builder] for updating a wallpaper. This will produce a uri starts with
+     * content://com.google.android.wallpaper.weathereffects.effectprovider/update_wallpaper. Append
+     * parameters such as foreground and background images, etc.
      *
      * All the parameters are optional.
      * <ul>
-     *   <li>For the initial generation, foreground and background images must be provided.
-     *   <li>When foreground and background images are already provided, but no weather type is
+     * <li>For the initial generation, foreground and background images must be provided.
+     * <li>When foreground and background images are already provided, but no weather type is
      *   provided, it clears the existing weather effect (foreground & background images composed).
      * </ul>
      *
@@ -37,7 +38,8 @@ object WallpaperInfoContract {
      * <path_to_background_texture>
      */
     fun getUpdateWallpaperUri(): Uri.Builder {
-        return Uri.Builder().scheme(SCHEME_CONTENT)
+        return Uri.Builder()
+            .scheme(SCHEME_CONTENT)
             .authority(AUTHORITY)
             .appendPath(WeatherEffectsContentProvider.UPDATE_WALLPAPER)
     }
@@ -45,6 +47,7 @@ object WallpaperInfoContract {
     enum class WeatherEffect(val value: String) {
         RAIN("rain"),
         FOG("fog"),
+        CLOUDS("clouds"),
         SNOW("snow"),
         SUN("SUN");
 
@@ -54,11 +57,10 @@ object WallpaperInfoContract {
              * Converts the String value to an enum.
              *
              * @param value a String representing the [value] of an enum. Note that this is the
-             * value that we created [value] and it does not refer to the [valueOf] value, which
-             * corresponds to the [name]. i.e.
-             * - RAIN("rain"):
-             *     -> [valueOf] needs [name] ("RAIN").
-             *     -> [fromStringValue] needs [value] ("rain").
+             *   value that we created [value] and it does not refer to the [valueOf] value, which
+             *   corresponds to the [name]. i.e.
+             * - RAIN("rain"): -> [valueOf] needs [name] ("RAIN"). -> [fromStringValue] needs
+             *   [value] ("rain").
              *
              * @return the associated [WeatherEffect].
              */
@@ -66,6 +68,7 @@ object WallpaperInfoContract {
                 return when (value) {
                     RAIN.value -> RAIN
                     FOG.value -> FOG
+                    CLOUDS.value -> CLOUDS
                     SNOW.value -> SNOW
                     SUN.value -> SUN
                     else -> null
@@ -85,8 +88,6 @@ object WallpaperInfoContract {
         const val BACKGROUND_TEXTURE = "background_texture"
         const val WEATHER_EFFECT = "weather_effect"
 
-        val DEFAULT_PROJECTION = arrayOf(
-            FOREGROUND_TEXTURE, BACKGROUND_TEXTURE, WEATHER_EFFECT
-        )
+        val DEFAULT_PROJECTION = arrayOf(FOREGROUND_TEXTURE, BACKGROUND_TEXTURE, WEATHER_EFFECT)
     }
 }
