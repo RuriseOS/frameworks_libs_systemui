@@ -28,7 +28,11 @@ data class SegmentKey(
     val minBreakpoint: BreakpointKey,
     val maxBreakpoint: BreakpointKey,
     val direction: InputDirection,
-)
+) {
+    override fun toString(): String {
+        return "SegmentKey(min=$minBreakpoint, max=$maxBreakpoint, direction=$direction)"
+    }
+}
 
 /**
  * Captures denormalized segment data from a [MotionSpec].
@@ -80,6 +84,13 @@ data class SegmentData(
     fun <T> semantic(semanticKey: SemanticKey<T>): T? {
         return spec.semanticState(semanticKey, key)
     }
+
+    val range: ClosedFloatingPointRange<Float>
+        get() = minBreakpoint.position..maxBreakpoint.position
+
+    override fun toString(): String {
+        return "SegmentData(key=$key, range=$range, mapping=$mapping)"
+    }
 }
 
 /**
@@ -95,6 +106,10 @@ fun interface Mapping {
     object Identity : Mapping {
         override fun map(input: Float): Float {
             return input
+        }
+
+        override fun toString(): String {
+            return "Identity"
         }
     }
 
@@ -138,5 +153,16 @@ fun interface Mapping {
         val Zero = Fixed(0f)
         val One = Fixed(1f)
         val Two = Fixed(2f)
+
+        /** Create a linear mapping defined as a line between {in0,out0} and {in1,out1}. */
+        fun Linear(in0: Float, out0: Float, in1: Float, out1: Float): Linear {
+            require(in0 != in1) {
+                "Cannot define a linear function with both inputs being the same ($in0)."
+            }
+
+            val factor = (out1 - out0) / (in1 - in0)
+            val offset = out0 - factor * in0
+            return Linear(factor, offset)
+        }
     }
 }
