@@ -17,11 +17,16 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
+min_widget_picker_sdk_version = "31" // same as launcher3
+
 android_library {
     name: "widget_picker_dagger_annotations",
+    sdk_version: "current",
+    min_sdk_version: min_widget_picker_sdk_version,
     srcs: [
         "src/com/android/widgetpicker/WidgetPickerSingleton.kt",
     ],
+
     static_libs: [
         "androidx.annotation_annotation",
         "jsr330",
@@ -30,6 +35,8 @@ android_library {
 
 android_library {
     name: "widget_picker_component",
+    sdk_version: "current",
+    min_sdk_version: min_widget_picker_sdk_version,
     srcs: [
         "src/com/android/widgetpicker/WidgetPickerModule.kt",
         "src/com/android/widgetpicker/WidgetPickerComponent.kt",
@@ -43,6 +50,8 @@ android_library {
 // Data types that are accessible & potentially provided by hosts using the widget picker library
 android_library {
     name: "widget_picker_shared_data_types",
+    sdk_version: "current",
+    min_sdk_version: min_widget_picker_sdk_version,
     srcs: [
         "src/com/android/widgetpicker/shared/model/PickableWidget.kt",
         "src/com/android/widgetpicker/shared/model/WidgetAppIcon.kt",
@@ -51,10 +60,16 @@ android_library {
         "src/com/android/widgetpicker/shared/model/WidgetPreview.kt",
         "src/com/android/widgetpicker/shared/model/WidgetUserProfiles.kt",
     ],
+    static_libs: [
+        "androidx.core_core-ktx",
+        "androidx.annotation_annotation",
+    ],
 }
 
 android_library {
     name: "widget_picker_data_repositories",
+    sdk_version: "current",
+    min_sdk_version: min_widget_picker_sdk_version,
     srcs: [
         "src/com/android/widgetpicker/data/repository/WidgetAppIconsRepository.kt",
         "src/com/android/widgetpicker/data/repository/WidgetPreviewRepository.kt",
@@ -67,5 +82,24 @@ android_library {
         "kotlinx_coroutines_android",
         "kotlinx_coroutines",
     ],
+}
 
+android_library {
+    name: "widget_picker_ui_components",
+    sdk_version: "current",
+    min_sdk_version: min_widget_picker_sdk_version,
+    srcs: [
+        "src/com/android/widgetpicker/ui/components/ScrollableFloatingToolbar.kt",
+        "src/com/android/widgetpicker/ui/components/LeadingIconToolbarTab.kt",
+    ],
+    static_libs: [
+        "androidx.compose.foundation_foundation",
+        "androidx.compose.foundation_foundation-layout",
+        "androidx.compose.runtime_runtime",
+        "androidx.compose.ui_ui",
+        "androidx.compose.ui_ui-tooling",
+        "androidx.compose.material3_material3",
+        "androidx.compose.material3_material3-window-size-class",
+        "androidx.compose.material_material-icons-extended",
+    ],
 }
