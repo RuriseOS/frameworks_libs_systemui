@@ -41,24 +41,18 @@ import com.google.android.wallpaper.weathereffects.data.repository.WallpaperFile
 import com.google.android.wallpaper.weathereffects.domain.WeatherEffectsInteractor
 import com.google.android.wallpaper.weathereffects.provider.WallpaperInfoContract
 import com.google.android.wallpaper.weathereffects.shared.model.WallpaperFileModel
+import java.io.File
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.File
-import javax.inject.Inject
 
 class WallpaperEffectsDebugActivity : TorusViewerActivity() {
 
-    @Inject
-    @MainScope
-    lateinit var mainScope: CoroutineScope
-    @Inject
-    @BackgroundScope
-    lateinit var bgScope: CoroutineScope
-    @Inject
-    lateinit var context: Context
-    @Inject
-    lateinit var interactor: WeatherEffectsInteractor
+    @Inject @MainScope lateinit var mainScope: CoroutineScope
+    @Inject @BackgroundScope lateinit var bgScope: CoroutineScope
+    @Inject lateinit var context: Context
+    @Inject lateinit var interactor: WeatherEffectsInteractor
 
     private lateinit var rootView: FrameLayout
     private lateinit var surfaceView: SurfaceView
@@ -73,13 +67,14 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
 
     override fun getWallpaperEngine(context: Context, surfaceView: SurfaceView): TorusEngine {
         this.surfaceView = surfaceView
-        val engine = WeatherEngine(
-            surfaceView.holder,
-            mainScope,
-            interactor,
-            context,
-            isDebugActivity = true
-        )
+        val engine =
+            WeatherEngine(
+                surfaceView.holder,
+                mainScope,
+                interactor,
+                context,
+                isDebugActivity = true,
+            )
         this.engine = engine
         return engine
     }
@@ -104,6 +99,11 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
         }
         rootView.requireViewById<Button>(R.id.fog).setOnClickListener {
             weatherEffect = WallpaperInfoContract.WeatherEffect.FOG
+            updateWallpaper()
+            setDebugText(context.getString(R.string.generating))
+        }
+        rootView.requireViewById<Button>(R.id.clouds).setOnClickListener {
+            weatherEffect = WallpaperInfoContract.WeatherEffect.CLOUDS
             updateWallpaper()
             setDebugText(context.getString(R.string.generating))
         }
@@ -133,46 +133,55 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
             i.action = WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
             i.putExtra(
                 WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                ComponentName(this, WeatherWallpaperService::class.java)
+                ComponentName(this, WeatherWallpaperService::class.java),
             )
             this.startActivityForResult(i, SET_WALLPAPER_REQUEST_CODE)
             saveWallpaper()
         }
 
-        rootView.requireViewById<FrameLayout>(R.id.wallpaper_layout)
-            .setOnTouchListener { view, event ->
-                when (event?.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        if (rootView.requireViewById<ConstraintLayout>(R.id.buttons).visibility
-                            == View.GONE) {
-                            showButtons()
-                        } else {
-                            hideButtons()
-                        }
+        rootView.requireViewById<FrameLayout>(R.id.wallpaper_layout).setOnTouchListener {
+            view,
+            event ->
+            when (event?.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (
+                        rootView.requireViewById<ConstraintLayout>(R.id.buttons).visibility ==
+                            View.GONE
+                    ) {
+                        showButtons()
+                    } else {
+                        hideButtons()
                     }
                 }
-
-                view.onTouchEvent(event)
             }
+
+            view.onTouchEvent(event)
+        }
 
         setDebugText()
         val seekBar = rootView.requireViewById<SeekBar>(R.id.seekBar)
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                // Convert progress to a value between 0 and 1
-                val value = progress.toFloat() / 100f
-                engine?.setTargetIntensity(value)
-                intensity = value
-            }
+        seekBar.setOnSeekBarChangeListener(
+            object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean,
+                ) {
+                    // Convert progress to a value between 0 and 1
+                    val value = progress.toFloat() / 100f
+                    engine?.setTargetIntensity(value)
+                    intensity = value
+                }
 
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                hideButtons()
-            }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                    hideButtons()
+                }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                showButtons()
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                    showButtons()
+                }
             }
-        })
+        )
         intensity = seekBar.progress.toFloat() / 100f
 
         // This avoids that the initial state after installing is showing a black screen.
@@ -186,21 +195,25 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
             clear()
             addAll(
                 listOf(
-                    /* TODO(b/300991599): Add debug assets. */
-                    FOREGROUND_IMAGE_1,
-                    FOREGROUND_IMAGE_2,
-                    FOREGROUND_IMAGE_3,
-                ).map { getFileFromAssets(it).absolutePath })
+                        /* TODO(b/300991599): Add debug assets. */
+                        FOREGROUND_IMAGE_1,
+                        FOREGROUND_IMAGE_2,
+                        FOREGROUND_IMAGE_3,
+                    )
+                    .map { getFileFromAssets(it).absolutePath }
+            )
         }
         bgCachedAssetPaths.apply {
             clear()
             addAll(
                 listOf(
-                    /* TODO(b/300991599): Add debug assets. */
-                    BACKGROUND_IMAGE_1,
-                    BACKGROUND_IMAGE_2,
-                    BACKGROUND_IMAGE_3,
-                ).map { getFileFromAssets(it).absolutePath })
+                        /* TODO(b/300991599): Add debug assets. */
+                        BACKGROUND_IMAGE_1,
+                        BACKGROUND_IMAGE_2,
+                        BACKGROUND_IMAGE_3,
+                    )
+                    .map { getFileFromAssets(it).absolutePath }
+            )
         }
     }
 
@@ -208,9 +221,7 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
         return File(context.cacheDir, fileName).also {
             if (!it.exists()) {
                 it.outputStream().use { cache ->
-                    context.assets.open(fileName).use { inputStream ->
-                        inputStream.copyTo(cache)
-                    }
+                    context.assets.open(fileName).use { inputStream -> inputStream.copyTo(cache) }
                 }
             }
         }
@@ -220,25 +231,17 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
         mainScope.launch {
             val fgPath = fgCachedAssetPaths[assetIndex]
             val bgPath = bgCachedAssetPaths[assetIndex]
-            interactor.updateWallpaper(
-                WallpaperFileModel(
-                    fgPath,
-                    bgPath,
-                    weatherEffect,
-                )
-            )
+            interactor.updateWallpaper(WallpaperFileModel(fgPath, bgPath, weatherEffect))
             engine?.setTargetIntensity(intensity)
             setDebugText(
                 "Wallpaper updated successfully.\n* Weather: " +
-                        "$weatherEffect\n* Foreground: $fgPath\n* Background: $bgPath"
+                    "$weatherEffect\n* Foreground: $fgPath\n* Background: $bgPath"
             )
         }
     }
 
     private fun saveWallpaper() {
-        bgScope.launch {
-            interactor.saveWallpaper()
-        }
+        bgScope.launch { interactor.saveWallpaper() }
     }
 
     private fun setDebugText(text: String? = null) {
@@ -265,14 +268,17 @@ class WallpaperEffectsDebugActivity : TorusViewerActivity() {
 
     private fun hideButtons() {
         val buttons = rootView.requireViewById<ConstraintLayout>(R.id.buttons)
-        buttons.animate()
+        buttons
+            .animate()
             .alpha(0f)
             .setDuration(400)
-            .setListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    buttons.visibility = View.GONE
+            .setListener(
+                object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        buttons.visibility = View.GONE
+                    }
                 }
-            })
+            )
     }
 
     private companion object {
