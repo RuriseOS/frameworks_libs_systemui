@@ -38,6 +38,7 @@ android_test {
         "androidx.compose.foundation_foundation-layout",
 
         // ":mechanics_tests" dependencies
+        "//frameworks/libs/systemui/mechanics:mechanics-testing",
         "androidx.compose.animation_animation-core",
         "platform-test-annotations",
         "PlatformMotionTestingCompose",
