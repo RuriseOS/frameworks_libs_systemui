@@ -91,6 +91,7 @@ android_library {
     srcs: [
         "src/com/android/widgetpicker/ui/components/ScrollableFloatingToolbar.kt",
         "src/com/android/widgetpicker/ui/components/LeadingIconToolbarTab.kt",
+        "src/com/android/widgetpicker/ui/components/TitledBottomSheet.kt",
     ],
     static_libs: [
         "androidx.compose.foundation_foundation",
@@ -101,5 +102,21 @@ android_library {
         "androidx.compose.material3_material3",
         "androidx.compose.material3_material3-window-size-class",
         "androidx.compose.material_material-icons-extended",
+        "androidx.activity_activity-compose",
+        "widget_picker_window_size_class",
+    ],
+}
+
+android_library {
+    name: "widget_picker_window_size_class",
+    sdk_version: "current",
+    min_sdk_version: min_widget_picker_sdk_version,
+    srcs: [
+        "src/com/android/widgetpicker/ui/windowsizeclass/WindowSizeClass.kt",
+    ],
+    static_libs: [
+        "androidx.compose.runtime_runtime",
+        "androidx.compose.material3_material3-window-size-class",
+        "androidx.window_window",
     ],
 }
