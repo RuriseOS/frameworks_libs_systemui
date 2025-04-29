@@ -31,9 +31,9 @@ import com.google.android.torus.core.wallpaper.LiveWallpaper
 import java.io.PrintWriter
 
 /**
- * Class that implements [TorusEngine] using Canvas and can be used in a [LiveWallpaper]. This
- * class also inherits from [LiveWallpaper.LiveWallpaperConnector] which allows to do some calls
- * related to Live Wallpapers, like the method [isPreview] or [notifyWallpaperColorsChanged].
+ * Class that implements [TorusEngine] using Canvas and can be used in a [LiveWallpaper]. This class
+ * also inherits from [LiveWallpaper.LiveWallpaperConnector] which allows to do some calls related
+ * to Live Wallpapers, like the method [isPreview] or [notifyWallpaperColorsChanged].
  *
  * By default it won't start [startUpdateLoop]. To run animations and update logic per frame, call
  * [startUpdateLoop] and [stopUpdateLoop] when it's no longer needed.
@@ -46,22 +46,22 @@ abstract class CanvasWallpaperEngine(
 
     /**
      * Defines if the surface should be hardware accelerated or not. If you are using
-     * [RuntimeShader], this value should be set to true. When setting it to true, some
-     * functions might not be supported. Please refer to the documentation:
+     * [RuntimeShader], this value should be set to true. When setting it to true, some functions
+     * might not be supported. Please refer to the documentation:
      * https://developer.android.com/guide/topics/graphics/hardware-accel#unsupported
      */
     private val hardwareAccelerated: Boolean = false,
 ) : LiveWallpaper.LiveWallpaperConnector(), TorusEngine {
 
     private val choreographer = Choreographer.getInstance()
-    private val timeController = TimeController().also {
-        it.resetDeltaTime(SystemClock.uptimeMillis())
-    }
+    private val timeController =
+        TimeController().also { it.resetDeltaTime(SystemClock.uptimeMillis()) }
     private val frameScheduler = FrameCallback()
     private val fpsThrottler = FpsThrottler()
 
     protected var screenSize = Size(0, 0)
         private set
+
     private var resizeCalled: Boolean = false
 
     private var isWallpaperEngineVisible = false
@@ -69,9 +69,9 @@ abstract class CanvasWallpaperEngine(
      * Indicates whether the engine#onCreate is called.
      *
      * TODO(b/277672928): These two booleans were introduced as a workaround where
-     *  [onSurfaceRedrawNeeded] called after an [onSurfaceDestroyed], without [onCreate]/
-     *  [onSurfaceCreated] being called between those. Remove these once it's fixed in
-     *  [WallpaperService].
+     *   [onSurfaceRedrawNeeded] called after an [onSurfaceDestroyed], without [onCreate]/
+     *   [onSurfaceCreated] being called between those. Remove these once it's fixed in
+     *   [WallpaperService].
      */
     private var isCreated = false
     private var shouldInvokeResume = false
@@ -110,8 +110,8 @@ abstract class CanvasWallpaperEngine(
      * update logic and render in this loop.
      *
      * @param deltaMillis The time in millis since the last time [onUpdate] was called.
-     * @param frameTimeNanos The time in nanoseconds when the frame started being rendered,
-     * in the [System.nanoTime] timebase.
+     * @param frameTimeNanos The time in nanoseconds when the frame started being rendered, in the
+     *   [System.nanoTime] timebase.
      */
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     open fun onUpdate(deltaMillis: Long, frameTimeNanos: Long) {
@@ -122,7 +122,7 @@ abstract class CanvasWallpaperEngine(
      * Callback to handle when we need to destroy the surface.
      *
      * @param isLastActiveInstance Whether this was the last wallpaper engine instance (until the
-     * next [onCreate]).
+     *   next [onCreate]).
      */
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     open fun onDestroy(isLastActiveInstance: Boolean) {
@@ -130,10 +130,11 @@ abstract class CanvasWallpaperEngine(
     }
 
     final override fun create(isFirstActiveInstance: Boolean) {
-        screenSize = Size(
-            getCurrentSurfaceHolder().surfaceFrame.width(),
-            getCurrentSurfaceHolder().surfaceFrame.height()
-        )
+        screenSize =
+            Size(
+                getCurrentSurfaceHolder().surfaceFrame.width(),
+                getCurrentSurfaceHolder().surfaceFrame.height(),
+            )
 
         onCreate(isFirstActiveInstance)
 
@@ -141,8 +142,10 @@ abstract class CanvasWallpaperEngine(
 
         if (shouldInvokeResume) {
             Log.e(
-                TAG, "Force invoke resume. onVisibilityChanged must have been called" +
-                        "before onCreate.")
+                TAG,
+                "Force invoke resume. onVisibilityChanged must have been called" +
+                    "before onCreate.",
+            )
             resume()
             shouldInvokeResume = false
         }
@@ -151,8 +154,10 @@ abstract class CanvasWallpaperEngine(
     final override fun pause() {
         if (!isCreated) {
             Log.e(
-                TAG, "Engine is not yet created but pause is called. Set a flag to invoke" +
-                        " resume on next create.")
+                TAG,
+                "Engine is not yet created but pause is called. Set a flag to invoke" +
+                    " resume on next create.",
+            )
             shouldInvokeResume = true
             return
         }
@@ -166,8 +171,10 @@ abstract class CanvasWallpaperEngine(
     final override fun resume() {
         if (!isCreated) {
             Log.e(
-                TAG, "Engine is not yet created but resume is called. Set a flag to " +
-                        "invoke resume on next create.")
+                TAG,
+                "Engine is not yet created but resume is called. Set a flag to " +
+                    "invoke resume on next create.",
+            )
             shouldInvokeResume = true
             return
         }
@@ -198,9 +205,8 @@ abstract class CanvasWallpaperEngine(
      * FPS that was set via [setFpsLimit].
      *
      * @param frameTimeNanos The time in nanoseconds when the frame started being rendered, in the
-     * [System.nanoTime] timebase.
+     *   [System.nanoTime] timebase.
      * @param onRender The callback triggered when the canvas is ready for render.
-     *
      * @return Whether it is rendered.
      */
     fun renderWithFpsLimit(frameTimeNanos: Long, onRender: (canvas: Canvas) -> Unit): Boolean {
@@ -215,16 +221,13 @@ abstract class CanvasWallpaperEngine(
             return renderWithFpsLimit(frameTimeNanos, onRender)
         }
 
-        return fpsThrottler.tryRender(frameTimeNanos) {
-            renderToCanvas(onRender)
-        }
+        return fpsThrottler.tryRender(frameTimeNanos) { renderToCanvas(onRender) }
     }
 
     /**
      * Renders to canvas.
      *
      * @param onRender The callback triggered when the canvas is ready for render.
-     *
      * @return Whether it is rendered.
      */
     fun render(onRender: (canvas: Canvas) -> Unit): Boolean {
@@ -250,9 +253,7 @@ abstract class CanvasWallpaperEngine(
         fpsThrottler.updateFps(fps)
     }
 
-    /**
-     * Starts the update loop.
-     */
+    /** Starts the update loop. */
     protected fun startUpdateLoop() {
         if (!frameScheduler.running) {
             frameScheduler.running = true
@@ -260,9 +261,7 @@ abstract class CanvasWallpaperEngine(
         }
     }
 
-    /**
-     * Stops the update loop.
-     */
+    /** Stops the update loop. */
     protected fun stopUpdateLoop() {
         if (frameScheduler.running) {
             frameScheduler.running = false
@@ -276,14 +275,14 @@ abstract class CanvasWallpaperEngine(
         var canvas: Canvas? = null
 
         try {
-            canvas = if (hardwareAccelerated) {
-                surfaceHolder.lockHardwareCanvas()
-            } else {
-                surfaceHolder.lockCanvas()
-            } ?: return false
+            canvas =
+                if (hardwareAccelerated) {
+                    surfaceHolder.lockHardwareCanvas()
+                } else {
+                    surfaceHolder.lockCanvas()
+                } ?: return false
 
             onRender(canvas)
-
         } catch (e: java.lang.Exception) {
             Log.e("canvas_exception", "canvas exception", e)
         } finally {
@@ -294,12 +293,9 @@ abstract class CanvasWallpaperEngine(
         return true
     }
 
-    private fun getCurrentSurfaceHolder(): SurfaceHolder =
-        getEngineSurfaceHolder() ?: defaultHolder
+    private fun getCurrentSurfaceHolder(): SurfaceHolder = getEngineSurfaceHolder() ?: defaultHolder
 
-    /**
-     * Implementation of [Choreographer.FrameCallback] which triggers [onUpdate].
-     */
+    /** Implementation of [Choreographer.FrameCallback] which triggers [onUpdate]. */
     inner class FrameCallback : Choreographer.FrameCallback {
         internal var running: Boolean = false
 

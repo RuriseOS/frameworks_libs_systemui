@@ -22,41 +22,38 @@ package com.google.android.torus.core.power
  */
 class FpsThrottler {
     companion object {
-        private const val NANO_TO_MILLIS = 1 / 1E6
+        const val NANO_TO_MILLIS = 1 / 1E6
 
         const val FPS_120 = 120f
         const val FPS_60 = 60f
         const val FPS_30 = 30f
         const val FPS_18 = 18f
 
-        @Deprecated(message = "Use FPS_60 instead.")
-        const val HIGH_FPS = 60f
-        @Deprecated(message = "Use FPS_30 instead.")
-        const val MED_FPS = 30f
-        @Deprecated(message = "Use FPS_18 instead.")
-        const val LOW_FPS = 18f
+        @Deprecated(message = "Use FPS_60 instead.") const val HIGH_FPS = 60f
+        @Deprecated(message = "Use FPS_30 instead.") const val MED_FPS = 30f
+        @Deprecated(message = "Use FPS_18 instead.") const val LOW_FPS = 18f
+
+        /** Small tolerance (ms) for float precision in frame timing. */
+        const val TOLERANCE_MILLIS = 1L
     }
 
     private var fps: Float = FPS_60
 
-    @Volatile
-    private var frameTimeMillis: Double = 1000.0 / fps.toDouble()
+    @Volatile private var frameTimeMillis: Double = 1000.0 / fps.toDouble()
     private var lastFrameTimeNanos: Long = -1
 
-    @Volatile
-    private var continuousRenderingMode: Boolean = true
+    @Volatile private var continuousRenderingMode: Boolean = true
 
-    @Volatile
-    private var requestRendering: Boolean = false
+    @Volatile private var requestRendering: Boolean = false
 
     private fun updateFrameTime() {
         frameTimeMillis = 1000.0 / fps.toDouble()
     }
 
     /**
-     * If [fps] is non-zero, update the requested FPS and calculate the frame time
-     * for the requested FPS. Otherwise disable continuous rendering (on demand rendering)
-     * without changing the frame rate.
+     * If [fps] is non-zero, update the requested FPS and calculate the frame time for the requested
+     * FPS. Otherwise disable continuous rendering (on demand rendering) without changing the frame
+     * rate.
      *
      * @param fps The requested FPS value.
      */
@@ -74,7 +71,7 @@ class FpsThrottler {
      * Sets rendering mode to continuous or on demand.
      *
      * @param continuousRenderingMode When true enable continuous rendering. When false disable
-     * continuous rendering (on demand).
+     *   continuous rendering (on demand).
      */
     fun setContinuousRenderingMode(continuousRenderingMode: Boolean) {
         this.continuousRenderingMode = continuousRenderingMode
@@ -86,13 +83,11 @@ class FpsThrottler {
     }
 
     /**
-     * Calculates whether we can render the next frame. In continuous mode return true only
-     * if enough time has passed since the last render to maintain requested FPS.
-     * In on demand mode, return true only if [requestRendering] was called to render
-     * the next frame.
+     * Calculates whether we can render the next frame. In continuous mode return true only if
+     * enough time has passed since the last render to maintain requested FPS. In on demand mode,
+     * return true only if [requestRendering] was called to render the next frame.
      *
      * @param frameTimeNanos The time in nanoseconds when the current frame started.
-     *
      * @return true if we can render the next frame.
      */
     fun canRender(frameTimeNanos: Long): Boolean {
@@ -102,7 +97,7 @@ class FpsThrottler {
                 true
             } else {
                 val deltaMillis = (frameTimeNanos - lastFrameTimeNanos) * NANO_TO_MILLIS
-                return (deltaMillis >= frameTimeMillis) && (fps > 0f)
+                return (deltaMillis >= frameTimeMillis - TOLERANCE_MILLIS) && (fps > 0f)
             }
         } else {
             // on demand rendering
@@ -119,8 +114,7 @@ class FpsThrottler {
      *
      * @param frameTimeNanos The time in nanoseconds when the current frame started.
      * @param onRenderPermitted The client delegate to dispatch if rendering is permitted at this
-     * time.
-     *
+     *   time.
      * @return true if a frame is permitted and then actually rendered.
      */
     fun tryRender(frameTimeNanos: Long, onRenderPermitted: () -> Boolean): Boolean {
