@@ -75,6 +75,11 @@ dependencies {
     implementation(libs.compose.runtime)
     implementation(libs.compose.foundation.layout)
     implementation(libs.compose.material3)
+    implementation(libs.androidx.activity.compose)
+
+    // Other UI dependencies
+    implementation(libs.androidx.material3.window.size.cls)
+    implementation(libs.androidx.window)
 
     // Compose android studio preview support
     implementation(libs.compose.material.icons.extended)
