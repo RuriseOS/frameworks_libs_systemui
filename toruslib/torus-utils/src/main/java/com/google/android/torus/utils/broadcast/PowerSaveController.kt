@@ -23,25 +23,24 @@ import android.os.PowerManager
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * PowerSaveController registers a BroadcastReceiver that listens to
- * changes in Power Save Mode provided by the OS.
- * Forwards received broadcasts to be handled by a [PowerSaveListener].
+ * PowerSaveController registers a BroadcastReceiver that listens to changes in Power Save Mode
+ * provided by the OS. Forwards received broadcasts to be handled by a [PowerSaveListener].
  */
-class PowerSaveController(
-    context: Context,
-    private val listener: PowerSaveListener?
-) : BroadcastEventController(context) {
+class PowerSaveController(context: Context, listener: PowerSaveListener?) :
+    BroadcastEventController(context) {
     companion object {
         const val DEFAULT_POWER_SAVE_MODE = false
     }
+
+    private val listeners = mutableListOf<PowerSaveListener>()
 
     private var powerSaving: AtomicBoolean? = null
     private var powerManager: PowerManager? = null
 
     override fun initResources(): Boolean {
         if (powerSaving == null) powerSaving = AtomicBoolean(DEFAULT_POWER_SAVE_MODE)
-        if (powerManager == null) powerManager =
-                context.getSystemService(Context.POWER_SERVICE) as PowerManager?
+        if (powerManager == null)
+            powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager?
         return powerManager != null
     }
 
@@ -59,21 +58,32 @@ class PowerSaveController(
 
     override fun onUnregister() {}
 
+    init {
+        if (listener != null) {
+            listeners.add(listener)
+        }
+    }
+
     private fun setPowerSave(isPowerSave: Boolean, fire: Boolean) {
         powerSaving?.let {
             if (it.get() == isPowerSave) return
             it.set(isPowerSave)
         }
 
-        listener?.let {
-            if (fire) listener.onPowerSaveModeChanged(isPowerSave)
-        }
+        listeners.forEach { listener -> if (fire) listener.onPowerSaveModeChanged(isPowerSave) }
     }
 
     fun isPowerSaving(): Boolean = powerSaving?.get() ?: false
 
+    fun registerListener(listener: PowerSaveListener) {
+        listeners += listener
+    }
+
+    fun unregisterListener(listener: PowerSaveListener) {
+        listeners -= listener
+    }
+
     interface PowerSaveListener {
         fun onPowerSaveModeChanged(isPowerSaveMode: Boolean)
     }
-
 }

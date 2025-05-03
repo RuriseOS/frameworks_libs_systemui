@@ -31,6 +31,10 @@ import com.android.mechanics.spring.SpringParameters
  * Device / scheme specific context for building motion specs.
  *
  * See go/motion-system.
+ *
+ * @see rememberMotionBuilderContext for Compose
+ * @see standardViewMotionBuilderContext for Views
+ * @see expressiveViewMotionBuilderContext for Views
  */
 interface MotionBuilderContext : Density {
     /**
@@ -80,7 +84,7 @@ fun rememberMotionBuilderContext(): MotionBuilderContext {
     return remember(density, motionScheme) { ComposeMotionBuilderContext(motionScheme, density) }
 }
 
-internal class ComposeMotionBuilderContext(motionScheme: MotionScheme, density: Density) :
+class ComposeMotionBuilderContext(motionScheme: MotionScheme, density: Density) :
     MotionBuilderContext, Density by density {
 
     override val spatial =
