@@ -27,13 +27,13 @@ public object ListenersTracing {
      * listeners.forEach { it.dispatch(state) }
      * ```
      *
-     * often it's tricky to udnerstand which listener is causing delays. This can be used instead to
+     * often it's tricky to understand which listener is causing delays. This can be used instead to
      * log how much each listener is taking:
      * ```
      * listeners.forEachTraced(TAG) { it.dispatch(state) }
      * ```
      */
-    public inline fun <T : Any> List<T>.forEachTraced(tag: String = "", f: (T) -> Unit) {
+    public inline fun <T : Any> Iterable<T>.forEachTraced(tag: String = "", f: (T) -> Unit) {
         forEach { traceSection({ "$tag#${it::javaClass.get().name}" }) { f(it) } }
     }
 }
