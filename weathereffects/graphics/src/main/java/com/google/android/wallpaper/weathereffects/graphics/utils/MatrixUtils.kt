@@ -74,11 +74,11 @@ object MatrixUtils {
         targetMatrix: Matrix,
         outArray: FloatArray,
     ): FloatArray {
-        targetMatrix.invert(inverseMatrix)
-        concatMatrix.set(originMatrix)
-        concatMatrix.postConcat(inverseMatrix)
+        originMatrix.invert(inverseMatrix)
+        concatMatrix.set(inverseMatrix)
+        concatMatrix.postConcat(targetMatrix)
         concatMatrix.getValues(matrixValues)
-        return transposeMatrixArray(matrixValues, outArray)
+        return invertAndTransposeMatrix(concatMatrix, outArray)
     }
 
     /**
