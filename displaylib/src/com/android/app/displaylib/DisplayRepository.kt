@@ -489,8 +489,10 @@ private sealed interface DisplayEvent {
  * upstream Flow.
  *
  * Useful for code that needs to compare the current value to the previous value.
+ *
+ * Note this has been taken from com.android.systemui.util.kotlin. It was copied to keep deps of
+ * displaylib minimal (and avoid creating a new shared lib for it).
  */
-// TODO b/401305290 - This should be moved to a shared lib, as it's also used by SystemUI.
 fun <T, R> Flow<T>.pairwiseBy(transform: suspend (old: T, new: T) -> R): Flow<R> = flow {
     val noVal = Any()
     var previousValue: Any? = noVal
