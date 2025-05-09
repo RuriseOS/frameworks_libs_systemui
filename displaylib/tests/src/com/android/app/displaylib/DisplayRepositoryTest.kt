@@ -19,9 +19,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import org.junit.runner.RunWith
 
-@SmallTest
-@RunWith(AndroidJUnit4::class)
-class DisplayRepositoryTest {
-
-    // TODO b/401305290 - Move tests from The SystemUI DisplayRepositoryImpl to here.
-}
+/**
+ * Tests for display repository are in SystemUI:
+ * frameworks/base/packages/SystemUI/multivalentTestsForDevice/src/com/android/systemui/display/data/repository/DisplayRepositoryTest.kt
+ *
+ * This is because the repository was initially there, and tests depend on kosmos for dependency
+ * injection (which is sysui-specific).
+ *
+ * In case of changes, update tests in sysui.
+ */
+@SmallTest @RunWith(AndroidJUnit4::class) class DisplayRepositoryTest
