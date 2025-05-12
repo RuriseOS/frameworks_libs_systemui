@@ -16,27 +16,25 @@
 
 package com.android.mechanics.effects
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.android.mechanics.spec.BreakpointKey
 import com.android.mechanics.spec.Mapping
+import com.android.mechanics.spec.SemanticKey
 import com.android.mechanics.spec.builder.Effect
 import com.android.mechanics.spec.builder.EffectApplyScope
 import com.android.mechanics.spec.builder.EffectPlacement
 import com.android.mechanics.spec.builder.MotionBuilderContext
-import com.android.mechanics.spec.builder.MotionSpecBuilderScope
+import com.android.mechanics.spec.with
 
-/** Creates a [FixedValue] effect with the given [value]. */
-fun MotionSpecBuilderScope.fixed(value: Float) = FixedValue(value)
+/** Gesture effect to soft-limit. */
+class Overdrag(
+    private val overdragLimit: SemanticKey<Float?> = Defaults.OverdragLimit,
+    private val maxOverdrag: Dp = Defaults.MaxOverdrag,
+    private val tilt: Float = Defaults.tilt,
+) : Effect.PlaceableBefore, Effect.PlaceableAfter {
 
-val MotionSpecBuilderScope.zero: FixedValue
-    get() = FixedValue.Zero
-val MotionSpecBuilderScope.one: FixedValue
-    get() = FixedValue.One
-
-/** Produces a fixed [value]. */
-class FixedValue(val value: Float) :
-    Effect.PlaceableAfter, Effect.PlaceableBefore, Effect.PlaceableBetween {
-
-    override fun MotionBuilderContext.intrinsicSize(): Float = Float.NaN
+    override fun MotionBuilderContext.intrinsicSize() = Float.POSITIVE_INFINITY
 
     override fun EffectApplyScope.createSpec(
         minLimit: Float,
@@ -45,11 +43,27 @@ class FixedValue(val value: Float) :
         maxLimitKey: BreakpointKey,
         placement: EffectPlacement,
     ) {
-        return unidirectional(Mapping.Fixed(value))
+
+        val maxOverdragPx = maxOverdrag.toPx()
+
+        val limitValue = baseValue(placement.start)
+        val mapping = Mapping { input ->
+            val baseMapped = baseMapping.map(input)
+
+            maxOverdragPx * kotlin.math.tanh((baseMapped - limitValue) / (maxOverdragPx * tilt)) +
+                limitValue
+        }
+
+        unidirectional(mapping, listOf(overdragLimit with limitValue)) {
+            if (!placement.isForward) {
+                after(semantics = listOf(overdragLimit with null))
+            }
+        }
     }
 
-    companion object {
-        val Zero = FixedValue(0f)
-        val One = FixedValue(1f)
+    object Defaults {
+        val OverdragLimit = SemanticKey<Float?>()
+        val MaxOverdrag = 30.dp
+        val tilt = 3f
     }
 }
