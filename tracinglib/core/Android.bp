@@ -28,6 +28,7 @@ java_library {
     static_libs: [
         "kotlinx_coroutines_android",
         "com_android_systemui_flags_lib",
+        "compilelib",
     ],
     kotlincflags: [
         "-Xjvm-default=all",

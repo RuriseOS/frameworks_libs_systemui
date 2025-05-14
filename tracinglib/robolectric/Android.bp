@@ -34,6 +34,7 @@ android_robolectric_test {
         "kotlinx_coroutines_android",
         "flag-junit",
         "com_android_systemui_flags_lib",
+        "compilelib",
     ],
     libs: [
         "androidx.test.core",
