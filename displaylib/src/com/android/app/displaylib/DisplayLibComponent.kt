@@ -50,6 +50,7 @@ interface DisplayLibComponent {
 
     val displayRepository: DisplayRepository
     val displaysWithDecorationsRepository: DisplaysWithDecorationsRepository
+    val displaysWithDecorationsRepositoryCompat: DisplaysWithDecorationsRepositoryCompat
 }
 
 @Module
