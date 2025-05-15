@@ -20,7 +20,8 @@ import com.android.app.displaylib.PerDisplayRepository
 import java.util.function.Consumer
 
 /** Fake version of [PerDisplayRepository], to be used in tests. */
-class FakePerDisplayRepository<T> : PerDisplayRepository<T> {
+class FakePerDisplayRepository<T>(private val defaultIfAbsent: ((Int) -> T)? = null) :
+    PerDisplayRepository<T> {
 
     private val instances = mutableMapOf<Int, T>()
 
@@ -33,7 +34,11 @@ class FakePerDisplayRepository<T> : PerDisplayRepository<T> {
     }
 
     override fun get(displayId: Int): T? {
-        return instances[displayId]
+        return if (defaultIfAbsent != null) {
+            instances.getOrPut(displayId) { defaultIfAbsent(displayId) }
+        } else {
+            instances[displayId]
+        }
     }
 
     override val debugName: String
