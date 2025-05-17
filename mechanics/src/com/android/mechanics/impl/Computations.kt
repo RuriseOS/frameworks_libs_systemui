@@ -435,7 +435,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                     var guaranteeState = lastGuaranteeState
                     var springState = lastSpringState
                     var springParameters = lastAnimation.springParameters
-                    var hasJumped = false
+                    var initialSpringVelocity = directMappedVelocity
 
                     var segmentIndex = sourceIndex
                     while (segmentIndex != targetIndex) {
@@ -495,7 +495,26 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
 
                         val delta = afterBreakpoint - beforeBreakpoint
                         val deltaIsFinite = delta.fastIsFinite()
-                        if (!deltaIsFinite) {
+                        if (deltaIsFinite && delta != 0f) {
+                            // There is a discontinuity on this breakpoint, that needs to be
+                            // animated. The delta is pushed to the spring, to consume the
+                            // discontinuity over time.
+                            springState =
+                                springState.nudge(
+                                    displacementDelta = -delta,
+                                    velocityDelta = initialSpringVelocity,
+                                )
+
+                            // When *first* crossing a discontinuity in a given frame, the static
+                            // mapped velocity observed during previous frame is added as initial
+                            // velocity to the spring. This is done ot most once per frame, and only
+                            // if there is an actual discontinuity.
+                            initialSpringVelocity = 0f
+                        } else {
+                            // The before and / or after mapping produced an non-finite number,
+                            // which is not allowed. This intentionally crashes eng-builds, since
+                            // it's a bug in the Mapping implementation that must be fixed. On
+                            // regular builds, it will likely cause a jumpcut.
                             Log.wtf(
                                 TAG,
                                 "Delta between breakpoints is undefined!\n" +
@@ -505,11 +524,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                                     "  after: $afterBreakpoint (mapping: $mappingAfter)",
                             )
                         }
-                        hasJumped = hasJumped || delta != 0f
 
-                        if (deltaIsFinite) {
-                            springState = springState.nudge(displacementDelta = -delta)
-                        }
                         segmentIndex += directionOffset
                         lastBreakpoint = nextBreakpoint
                         guaranteeState =
@@ -528,10 +543,6 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
 
                                 is Guarantee.None -> GuaranteeState.Inactive
                             }
-                    }
-
-                    if (hasJumped) {
-                        springState = springState.nudge(velocityDelta = directMappedVelocity)
                     }
 
                     val tightened = guarantee.updatedSpringParameters(segment.entryBreakpoint)

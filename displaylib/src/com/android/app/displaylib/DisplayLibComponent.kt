@@ -17,6 +17,7 @@ package com.android.app.displaylib
 
 import android.hardware.display.DisplayManager
 import android.os.Handler
+import android.view.IWindowManager
 import dagger.Binds
 import dagger.BindsInstance
 import dagger.Component
@@ -40,6 +41,7 @@ interface DisplayLibComponent {
     interface Factory {
         fun create(
             @BindsInstance displayManager: DisplayManager,
+            @BindsInstance windowManager: IWindowManager,
             @BindsInstance bgHandler: Handler,
             @BindsInstance bgApplicationScope: CoroutineScope,
             @BindsInstance backgroundCoroutineDispatcher: CoroutineDispatcher,
@@ -47,11 +49,18 @@ interface DisplayLibComponent {
     }
 
     val displayRepository: DisplayRepository
+    val displaysWithDecorationsRepository: DisplaysWithDecorationsRepository
+    val displaysWithDecorationsRepositoryCompat: DisplaysWithDecorationsRepositoryCompat
 }
 
 @Module
 interface DisplayLibModule {
     @Binds fun bindDisplayManagerImpl(impl: DisplayRepositoryImpl): DisplayRepository
+
+    @Binds
+    fun bindDisplaysWithDecorationsRepositoryImpl(
+        impl: DisplaysWithDecorationsRepositoryImpl
+    ): DisplaysWithDecorationsRepository
 }
 
 /**
@@ -63,10 +72,17 @@ interface DisplayLibModule {
  */
 fun createDisplayLibComponent(
     displayManager: DisplayManager,
+    windowManager: IWindowManager,
     bgHandler: Handler,
     bgApplicationScope: CoroutineScope,
     backgroundCoroutineDispatcher: CoroutineDispatcher,
 ): DisplayLibComponent {
     return DaggerDisplayLibComponent.factory()
-        .create(displayManager, bgHandler, bgApplicationScope, backgroundCoroutineDispatcher)
+        .create(
+            displayManager,
+            windowManager,
+            bgHandler,
+            bgApplicationScope,
+            backgroundCoroutineDispatcher,
+        )
 }

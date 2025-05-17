@@ -38,14 +38,15 @@ import com.android.mechanics.spec.builder.DirectionalBuilderScope
 import com.android.mechanics.spec.builder.MotionBuilderContext
 import com.android.mechanics.spec.builder.directionalMotionSpec
 import com.android.mechanics.spec.with
-import com.android.mechanics.testing.CapturedSemantics
 import com.android.mechanics.testing.ComposeMotionValueToolkit
 import com.android.mechanics.testing.FakeMotionSpecBuilderContext
+import com.android.mechanics.testing.FeatureCaptures
 import com.android.mechanics.testing.VerifyTimeSeriesResult.AssertTimeSeriesMatchesGolden
 import com.android.mechanics.testing.VerifyTimeSeriesResult.SkipGoldenVerification
 import com.android.mechanics.testing.animateValueTo
 import com.android.mechanics.testing.animatedInputSequence
 import com.android.mechanics.testing.dataPoints
+import com.android.mechanics.testing.defaultFeatureCaptures
 import com.android.mechanics.testing.goldenTest
 import com.android.mechanics.testing.input
 import com.android.mechanics.testing.isStable
@@ -59,7 +60,7 @@ import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 import platform.test.motion.MotionTestRule
 import platform.test.motion.compose.runMonotonicClockTest
-import platform.test.motion.golden.DataPointTypes.string
+import platform.test.motion.golden.DataPointTypes
 import platform.test.motion.testing.createGoldenPathManager
 
 @RunWith(AndroidJUnit4::class)
@@ -80,7 +81,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
                 // There must never be an ongoing animation.
                 assertThat(isStable).doesNotContain(false)
 
-                AssertTimeSeriesMatchesGolden
+                AssertTimeSeriesMatchesGolden()
             },
         ) {
             animateValueTo(100f)
@@ -107,7 +108,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     @Test
     fun segmentChange_inMaxDirection_animatedWhenReachingBreakpoint() =
         motion.goldenTest(
-            spec = specBuilder(Mapping.Zero) { constantValue(breakpoint = 1f, value = 1f) }
+            spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 1f, value = 1f) }
         ) {
             animateValueTo(1f, changePerFrame = 0.5f)
             awaitStable()
@@ -118,7 +119,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             initialValue = 2f,
             initialDirection = InputDirection.Min,
-            spec = specBuilder(Mapping.Zero) { constantValue(breakpoint = 1f, value = 1f) },
+            spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 1f, value = 1f) },
         ) {
             animateValueTo(1f, changePerFrame = 0.5f)
             awaitStable()
@@ -149,7 +150,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, guarantee = None, value = 1f)
+                    fixedValue(breakpoint = 1f, guarantee = None, value = 1f)
                 }
         ) {
             animateValueTo(5f, changePerFrame = 0.5f)
@@ -161,7 +162,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, guarantee = InputDelta(3f), value = 1f)
+                    fixedValue(breakpoint = 1f, guarantee = InputDelta(3f), value = 1f)
                 }
         ) {
             animateValueTo(4f, changePerFrame = 0.5f)
@@ -172,7 +173,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, guarantee = GestureDragDelta(3f), value = 1f)
+                    fixedValue(breakpoint = 1f, guarantee = GestureDragDelta(3f), value = 1f)
                 }
         ) {
             animateValueTo(1f, changePerFrame = 0.5f)
@@ -184,7 +185,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
 
     @Test
     fun segmentChange_appliesOutputVelocity_atSpringStart() =
-        motion.goldenTest(spec = specBuilder { constantValue(breakpoint = 10f, value = 20f) }) {
+        motion.goldenTest(spec = specBuilder { fixedValue(breakpoint = 10f, value = 20f) }) {
             animateValueTo(11f, changePerFrame = 3f)
             awaitStable()
         }
@@ -195,7 +196,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             spec =
                 specBuilder {
                     fractionalInputFromCurrent(breakpoint = 10f, fraction = 1f, delta = 20f)
-                    constantValueFromCurrent(breakpoint = 20f)
+                    fixedValueFromCurrent(breakpoint = 20f)
                 }
         ) {
             animateValueTo(21f, changePerFrame = 3f)
@@ -208,7 +209,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             spec =
                 specBuilder {
                     fractionalInputFromCurrent(breakpoint = 10f, fraction = 5f, delta = 5f)
-                    constantValueFromCurrent(breakpoint = 20f)
+                    fixedValueFromCurrent(breakpoint = 20f)
                 }
         ) {
             animateValueTo(30f, changePerFrame = 3f)
@@ -221,7 +222,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             spec =
                 specBuilder {
                     fractionalInputFromCurrent(breakpoint = 10f, fraction = 5f, delta = 5f)
-                    constantValueFromCurrent(breakpoint = 20f, delta = -5f)
+                    fixedValueFromCurrent(breakpoint = 20f, delta = -5f)
                 }
         ) {
             animateValueTo(30f, changePerFrame = 3f)
@@ -234,9 +235,9 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, value = 20f)
-                    constantValue(breakpoint = 2f, value = 20f)
-                    constantValue(breakpoint = 3f, value = 10f)
+                    fixedValue(breakpoint = 1f, value = 20f)
+                    fixedValue(breakpoint = 2f, value = 20f)
+                    fixedValue(breakpoint = 3f, value = 10f)
                 },
             stableThreshold = 1f,
         ) {
@@ -251,7 +252,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         fun generateSpec(offset: Float) =
             specBuilder(Mapping.Zero) {
                 targetFromCurrent(breakpoint = offset, key = B1, delta = 1f, to = 2f)
-                constantValue(breakpoint = offset + 1f, key = B2, value = 0f)
+                fixedValue(breakpoint = offset + 1f, key = B2, value = 0f)
             }
 
         motion.goldenTest(spec = generateSpec(0f), initialValue = .5f) {
@@ -270,7 +271,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         fun generateSpec(offset: Float) =
             specBuilder(Mapping.Zero) {
                 targetFromCurrent(breakpoint = offset, key = B1, delta = 1f, to = 2f)
-                constantValue(breakpoint = offset + 1f, key = B2, value = 0f)
+                fixedValue(breakpoint = offset + 1f, key = B2, value = 0f)
             }
 
         motion.goldenTest(spec = generateSpec(0f), initialValue = .5f) {
@@ -287,7 +288,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     @Test
     fun directionChange_maxToMin_changesSegmentWithDirectionChange() =
         motion.goldenTest(
-            spec = specBuilder(Mapping.Zero) { constantValue(breakpoint = 1f, value = 1f) },
+            spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 1f, value = 1f) },
             initialValue = 2f,
             initialDirection = InputDirection.Max,
             directionChangeSlop = 3f,
@@ -299,7 +300,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     @Test
     fun directionChange_minToMax_changesSegmentWithDirectionChange() =
         motion.goldenTest(
-            spec = specBuilder(Mapping.Zero) { constantValue(breakpoint = 1f, value = 1f) },
+            spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 1f, value = 1f) },
             initialValue = 0f,
             initialDirection = InputDirection.Min,
             directionChangeSlop = 3f,
@@ -313,7 +314,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, value = 1f, guarantee = InputDelta(1f))
+                    fixedValue(breakpoint = 1f, value = 1f, guarantee = InputDelta(1f))
                 },
             initialValue = 2f,
             initialDirection = InputDirection.Max,
@@ -328,8 +329,8 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, value = 1f)
-                    constantValue(breakpoint = 2f, value = 2f)
+                    fixedValue(breakpoint = 1f, value = 1f)
+                    fixedValue(breakpoint = 2f, value = 2f)
                 }
         ) {
             animateValueTo(3f, changePerFrame = 0.2f)
@@ -341,8 +342,8 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, value = 1f)
-                    constantValue(breakpoint = 2f, value = 2f)
+                    fixedValue(breakpoint = 1f, value = 1f)
+                    fixedValue(breakpoint = 2f, value = 2f)
                 }
         ) {
             updateInput(2.5f)
@@ -354,16 +355,8 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValueFromCurrent(
-                        breakpoint = 1f,
-                        delta = 5f,
-                        guarantee = InputDelta(.9f),
-                    )
-                    constantValueFromCurrent(
-                        breakpoint = 2f,
-                        delta = 1f,
-                        guarantee = InputDelta(.9f),
-                    )
+                    fixedValueFromCurrent(breakpoint = 1f, delta = 5f, guarantee = InputDelta(.9f))
+                    fixedValueFromCurrent(breakpoint = 2f, delta = 1f, guarantee = InputDelta(.9f))
                 }
         ) {
             updateInput(2.1f)
@@ -375,8 +368,8 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec =
                 specBuilder(Mapping.Zero) {
-                    constantValue(breakpoint = 1f, value = 1f, guarantee = InputDelta(1f))
-                    constantValue(breakpoint = 2f, value = 2f)
+                    fixedValue(breakpoint = 1f, value = 1f, guarantee = InputDelta(1f))
+                    fixedValue(breakpoint = 2f, value = 2f)
                 },
             initialValue = 2.5f,
             initialDirection = InputDirection.Max,
@@ -411,11 +404,17 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         val s1 = SemanticKey<String>("Foo")
         val spec =
             specBuilder(Mapping.Zero, semantics = listOf(s1 with "zero")) {
-                constantValue(1f, 1f, semantics = listOf(s1 with "one"))
-                constantValue(2f, 2f, semantics = listOf(s1 with "two"))
+                fixedValue(1f, 1f, semantics = listOf(s1 with "one"))
+                fixedValue(2f, 2f, semantics = listOf(s1 with "two"))
             }
 
-        motion.goldenTest(spec = spec, semantics = listOf(CapturedSemantics(s1, string))) {
+        motion.goldenTest(
+            spec = spec,
+            capture = {
+                defaultFeatureCaptures()
+                feature(FeatureCaptures.semantics(s1, DataPointTypes.string))
+            },
+        ) {
             animateValueTo(3f, changePerFrame = .2f)
             awaitStable()
         }
@@ -435,8 +434,8 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         val s1 = SemanticKey<String>("Foo")
         val spec =
             specBuilder(Mapping.Zero, semantics = listOf(s1 with "zero")) {
-                constantValue(1f, 1f, semantics = listOf(s1 with "one"))
-                constantValue(2f, 2f, semantics = listOf(s1 with "two"))
+                fixedValue(1f, 1f, semantics = listOf(s1 with "one"))
+                fixedValue(2f, 2f, semantics = listOf(s1 with "two"))
             }
 
         val input = mutableFloatStateOf(0f)
@@ -451,8 +450,8 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     fun segment_returnsCurrentSegmentKey() {
         val spec =
             specBuilder(Mapping.Zero) {
-                constantValue(1f, 1f, key = B1)
-                constantValue(2f, 2f, key = B2)
+                fixedValue(1f, 1f, key = B1)
+                fixedValue(2f, 2f, key = B2)
             }
 
         val input = mutableFloatStateOf(1f)
@@ -467,7 +466,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     @Test
     fun derivedValue_reflectsInputChangeInSameFrame() {
         motion.goldenTest(
-            spec = specBuilder(Mapping.Zero) { constantValue(breakpoint = 0.5f, value = 1f) },
+            spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 0.5f, value = 1f) },
             createDerived = { primary ->
                 listOf(MotionValue.createDerived(primary, MotionSpec.Empty, label = "derived"))
             },
@@ -477,9 +476,9 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
                     .containsExactlyElementsIn(dataPoints<Float>("derived-output"))
                     .inOrder()
                 // and its never animated.
-                assertThat(dataPoints<Float>("derived-isStable")).doesNotContain(false)
+                assertThat(dataPoints<Boolean>("derived-isStable")).doesNotContain(false)
 
-                AssertTimeSeriesMatchesGolden
+                AssertTimeSeriesMatchesGolden()
             },
         ) {
             animateValueTo(1f, changePerFrame = 0.1f)
@@ -490,12 +489,12 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     @Test
     fun derivedValue_hasAnimationLifecycleOnItsOwn() {
         motion.goldenTest(
-            spec = specBuilder(Mapping.Zero) { constantValue(breakpoint = 0.5f, value = 1f) },
+            spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 0.5f, value = 1f) },
             createDerived = { primary ->
                 listOf(
                     MotionValue.createDerived(
                         primary,
-                        specBuilder(Mapping.One) { constantValue(breakpoint = 0.5f, value = 0f) },
+                        specBuilder(Mapping.One) { fixedValue(breakpoint = 0.5f, value = 0f) },
                         label = "derived",
                     )
                 )
