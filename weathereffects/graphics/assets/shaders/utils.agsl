@@ -150,7 +150,3 @@ float2 transformPoint(mat3 transformMatrix, float2 point) {
     // Convert back to Cartesian coordinates (x, y)
     return transformedPoint.xy / transformedPoint.z;
 }
-
-float normalizeValue(float x, float minVal, float maxVal) {
-    return (x - minVal) / (maxVal - minVal);
-}
