@@ -21,10 +21,8 @@ uniform float2 gridSize;
 uniform float time;
 uniform float screenAspectRatio;
 uniform float2 screenSize;
-uniform float cellAspectRatio;
 uniform mat3 transformMatrixBitmap;
 uniform mat3 transformMatrixWeather;
-uniform shader snowFlakeSamples;
 
 #include "shaders/constants.agsl"
 #include "shaders/utils.agsl"
@@ -32,13 +30,11 @@ uniform shader snowFlakeSamples;
 
 // Snow tint.
 const vec4 snowColor = vec4(1., 1., 1., 0.95);
-
 // Background tint
 const vec4 bgdTint = vec4(0.8, 0.8, 0.8, 0.07);
 
-
 // Indices of the different snow layers.
-const float farthestSnowLayerIndex = 4;
+const float farthestSnowLayerIndex = 6;
 const float midSnowLayerIndex = 2;
 const float closestSnowLayerIndex = 0;
 
