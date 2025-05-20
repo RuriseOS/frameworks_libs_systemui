@@ -32,8 +32,6 @@ data class SnowEffectConfig(
     val colorGradingShader: RuntimeShader,
     /** The shader of accumulated snow with fluffy effects. */
     val accumulatedSnowResultShader: RuntimeShader,
-    /** The shader of generate snow flake patterns. */
-    val snowFlakeSamples: RuntimeShader,
     /**
      * The noise texture, which will be used to add fluffiness to the snow flakes. The texture is
      * expected to be tileable, and at least 16-bit per channel for render quality.
@@ -65,7 +63,6 @@ data class SnowEffectConfig(
         colorGradingShader = GraphicsUtils.loadShader(assets, COLOR_GRADING_SHADER_PATH),
         accumulatedSnowResultShader =
             GraphicsUtils.loadShader(assets, ACCUMULATED_SNOW_RESULT_SHADER_PATH),
-        snowFlakeSamples = GraphicsUtils.loadShader(assets, SNOW_FLAKE_SPRITE_SHEET_PATH),
         noiseTexture =
             GraphicsUtils.loadTexture(assets, NOISE_TEXTURE_PATH)
                 ?: throw RuntimeException("Noise texture is missing."),
@@ -82,7 +79,6 @@ data class SnowEffectConfig(
         private const val ACCUMULATED_SNOW_RESULT_SHADER_PATH =
             "shaders/snow_accumulation_result.agsl"
         private const val COLOR_GRADING_SHADER_PATH = "shaders/color_grading_lut.agsl"
-        private const val SNOW_FLAKE_SPRITE_SHEET_PATH = "shaders/snow_flake_samples.agsl"
         private const val NOISE_TEXTURE_PATH = "textures/clouds.png"
         private const val LOOKUP_TABLE_TEXTURE_PATH = "textures/snow_lut.png"
         private const val COLOR_GRADING_INTENSITY = 0.25f
