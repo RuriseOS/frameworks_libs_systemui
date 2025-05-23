@@ -93,7 +93,8 @@ Coroutine tracing is flagged off by default. To enable coroutine tracing on a de
 and restart the user-space system:
 
 ```
-adb shell device_config override systemui com.android.systemui.coroutine_tracing true
+adb shell aflags enable com.android.systemui.coroutine_tracing
+adb shell setprop persist.debug.coroutine_tracing 1
 adb shell am restart
 ```
 
@@ -101,8 +102,8 @@ adb shell am restart
 
 The behavior of coroutine tracing can be further fine-tuned using the following sysprops:
 
- - `debug.coroutine_tracing.walk_stack_override`
- - `debug.coroutine_tracing.count_continuations_override`
+ - `persist.debug.coroutine_tracing.walk_stack_override`
+ - `persist.debug.coroutine_tracing.count_continuations_override`
 
 See [`createCoroutineTracingContext()`](core/src/coroutines/TraceContextElement.kt) for
 documentation.
