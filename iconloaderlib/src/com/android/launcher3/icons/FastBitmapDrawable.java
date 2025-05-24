@@ -33,6 +33,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.FloatProperty;
+import android.util.Log;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
@@ -46,6 +47,7 @@ import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags;
 
 public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
 
+    private static final String TAG = "FastBitmapDrawable";
     private static final Interpolator ACCEL = new AccelerateInterpolator();
     private static final Interpolator DEACCEL = new DecelerateInterpolator();
     private static final Interpolator HOVER_EMPHASIZED_DECELERATE_INTERPOLATOR =
@@ -67,7 +69,8 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
     private boolean mAnimationEnabled = true;
 
     protected final Paint mPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
-    public final BitmapInfo mBitmapInfo;
+    // b/404578798 - mBitmapInfo isn't expected to be null, but it is in some cases.
+    @Nullable public final BitmapInfo mBitmapInfo;
 
     @Nullable private ColorFilter mColorFilter;
 
@@ -109,6 +112,9 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
     }
 
     public FastBitmapDrawable(BitmapInfo info) {
+        if (info == null) {
+            Log.e(TAG, "BitmapInfo should not be null.", new Exception());
+        }
         mBitmapInfo = info;
         setFilterBitmap(true);
     }
@@ -152,6 +158,9 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
     }
 
     protected void drawInternal(Canvas canvas, Rect bounds) {
+        if (mBitmapInfo == null) {
+            return;
+        }
         canvas.drawBitmap(mBitmapInfo.icon, null, bounds, mPaint);
     }
 
@@ -160,6 +169,9 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
      */
     public int getIconColor() {
         int whiteScrim = setColorAlphaBound(Color.WHITE, WHITE_SCRIM_ALPHA);
+        if (mBitmapInfo == null) {
+            return whiteScrim;
+        }
         return ColorUtils.compositeColors(whiteScrim, mBitmapInfo.color);
     }
 
@@ -227,11 +239,17 @@ public class FastBitmapDrawable extends Drawable implements Drawable.Callback {
 
     @Override
     public int getIntrinsicWidth() {
+        if (mBitmapInfo == null) {
+            return 0;
+        }
         return mBitmapInfo.icon.getWidth();
     }
 
     @Override
     public int getIntrinsicHeight() {
+        if (mBitmapInfo == null) {
+            return 0;
+        }
         return mBitmapInfo.icon.getHeight();
     }
 

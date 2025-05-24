@@ -24,6 +24,7 @@ import android.graphics.Paint
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.graphics.Shader
+import android.hardware.HardwareBuffer
 import android.util.SizeF
 import androidx.core.graphics.createBitmap
 import com.google.android.wallpaper.weathereffects.graphics.FrameBuffer
@@ -67,6 +68,27 @@ class SnowEffect(
     private val accumulationFrameBufferPaint =
         Paint().also { it.shader = snowConfig.accumulatedSnowResultShader }
 
+    private val snowFlakeSamplesBuffer: FrameBuffer =
+        if (
+            HardwareBuffer.isSupported(
+                SNOW_FLAKE_SAMPLES_BUFFER_WIDTH,
+                SNOW_FLAKE_SAMPLES_BUFFER_HEIGHT,
+                HardwareBuffer.RGB_888,
+                1,
+                HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT,
+            )
+        ) {
+            FrameBuffer(
+                SNOW_FLAKE_SAMPLES_BUFFER_WIDTH,
+                SNOW_FLAKE_SAMPLES_BUFFER_HEIGHT,
+                HardwareBuffer.RGB_888,
+            )
+        } else {
+            FrameBuffer(SNOW_FLAKE_SAMPLES_BUFFER_WIDTH, SNOW_FLAKE_SAMPLES_BUFFER_HEIGHT)
+        }
+
+    private val snowFlakeSamplesPaint = Paint().also { it.shader = snowConfig.snowFlakeSamples }
+
     init {
         outlineFrameBuffer.setRenderEffect(
             RenderEffect.createBlurEffect(
@@ -75,6 +97,7 @@ class SnowEffect(
                 Shader.TileMode.CLAMP,
             )
         )
+
         updateTextureUniforms()
         adjustCropping(surfaceSize)
         prepareColorGrading()
@@ -83,11 +106,11 @@ class SnowEffect(
 
         // Generate accumulated snow at the end after we updated all the uniforms.
         generateAccumulatedSnow()
+        generateSnowFlakeSamples()
     }
 
     override fun update(deltaMillis: Long, frameTimeNanos: Long) {
         elapsedTime += snowSpeed * TimeUtils.millisToSeconds(deltaMillis)
-
         snowConfig.shader.setFloatUniform("time", elapsedTime)
         snowConfig.colorGradingShader.setInputShader("texture", snowConfig.shader)
     }
@@ -100,6 +123,7 @@ class SnowEffect(
         super.release()
         outlineFrameBuffer.close()
         accumulationFrameBuffer.close()
+        snowFlakeSamplesBuffer.close()
     }
 
     override fun setIntensity(intensity: Float) {
@@ -190,6 +214,11 @@ class SnowEffect(
             "noise",
             BitmapShader(snowConfig.noiseTexture, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT),
         )
+        snowConfig.shader.setFloatUniform("snowFlakeSamplesSize", SNOW_FLAKE_SAMPLES_SIZE.toFloat())
+        snowConfig.snowFlakeSamples.setFloatUniform(
+            "snowFlakeSamplesSize",
+            SNOW_FLAKE_SAMPLES_SIZE.toFloat(),
+        )
     }
 
     private fun prepareColorGrading() {
@@ -224,7 +253,7 @@ class SnowEffect(
         outlineFrameBuffer.endDrawing()
 
         outlineFrameBuffer.tryObtainingImage(
-            ::generateAccumulatedSnowWithBlurredOutline,
+            this::generateAccumulatedSnowWithBlurredOutline,
             mainExecutor,
         )
     }
@@ -258,7 +287,36 @@ class SnowEffect(
 
     override fun updateGridSize(newSurfaceSize: SizeF) {
         val gridSize = GraphicsUtils.computeDefaultGridSize(newSurfaceSize, snowConfig.pixelDensity)
-        snowConfig.shader.setFloatUniform("gridSize", 7 * gridSize, 2f * gridSize)
+        val gridSizeColumns = 7f * gridSize
+        val gridSizeRows = 2f * gridSize
+        snowConfig.shader.setFloatUniform("gridSize", gridSizeColumns, gridSizeRows)
+        snowConfig.shader.setFloatUniform("cellAspectRatio", gridSizeColumns / gridSizeRows)
+    }
+
+    /**
+     * Generates an offscreen bitmap containing pre-rendered snow flake patterns and properties.
+     *
+     * This bitmap serves as a lookup table for the main snow_effect shader, reducing per-frame
+     * calculations.
+     */
+    private fun generateSnowFlakeSamples() {
+        val renderingCanvas = snowFlakeSamplesBuffer.beginDrawing()
+        snowConfig.snowFlakeSamples.setFloatUniform(
+            "canvasSize",
+            SNOW_FLAKE_SAMPLES_BUFFER_WIDTH.toFloat(),
+            SNOW_FLAKE_SAMPLES_BUFFER_HEIGHT.toFloat(),
+        )
+        renderingCanvas.drawPaint(snowFlakeSamplesPaint)
+        snowFlakeSamplesBuffer.endDrawing()
+        snowFlakeSamplesBuffer.tryObtainingImage(
+            { snowFlakeSamples ->
+                snowConfig.shader.setInputShader(
+                    "snowFlakeSamples",
+                    BitmapShader(snowFlakeSamples, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
+                )
+            },
+            mainExecutor,
+        )
     }
 
     companion object {
@@ -272,5 +330,20 @@ class SnowEffect(
         // To prevent displaying outdated accumulation, we use a tiny blank bitmap to temporarily
         // clear the rendering area before the new texture is ready.
         private val blankBitmap = createBitmap(1, 1)
+
+        // The `snow_flakes_samples` shader pre-generates diverse snow flake properties
+        // (shape mask, intensity, etc.) in a bitmap, reducing per-frame calculations. A higher
+        // column count provides more x-based visual variations.
+        // The following values balance the visual benefits with memory and shader sampling costs.
+        // Number of columns; increases x-based variation.
+        const val SNOW_FLAKE_SAMPLES_COLUMN_COUNT = 14
+        const val SNOW_FLAKE_SAMPLES_ROW_COUNT = 4
+        // Side length of each flake's square bounding box.
+        const val SNOW_FLAKE_SAMPLES_SIZE = 100
+
+        const val SNOW_FLAKE_SAMPLES_BUFFER_WIDTH =
+            SNOW_FLAKE_SAMPLES_COLUMN_COUNT * SNOW_FLAKE_SAMPLES_SIZE
+        const val SNOW_FLAKE_SAMPLES_BUFFER_HEIGHT =
+            SNOW_FLAKE_SAMPLES_ROW_COUNT * SNOW_FLAKE_SAMPLES_SIZE
     }
 }

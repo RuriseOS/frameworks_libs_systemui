@@ -70,7 +70,7 @@ class ThemedIconDrawable(constantState: ThemedConstantState) :
     override fun getIconColor() = colorFg
 
     class ThemedConstantState(
-        bitmapInfo: BitmapInfo,
+        bitmapInfo: BitmapInfo?,
         val mono: Bitmap,
         val whiteShadowLayer: Bitmap,
         val colorBg: Int,

@@ -118,14 +118,10 @@ class RainEffect(
         get() = rainConfig.colorGradingIntensity
 
     override fun updateTextureUniforms() {
-        val foregroundBuffer =
-            BitmapShader(super.foreground, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR)
-        rainConfig.rainShowerShader.setInputBuffer("foreground", foregroundBuffer)
-        rainConfig.outlineShader.setInputBuffer("texture", foregroundBuffer)
-
-        rainConfig.rainShowerShader.setInputBuffer(
-            "background",
-            BitmapShader(super.background, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
+        super.updateTextureUniforms()
+        rainConfig.outlineShader.setInputBuffer(
+            "texture",
+            BitmapShader(super.foreground, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
         )
         createOutlineBuffer()
     }
