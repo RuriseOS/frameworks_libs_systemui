@@ -21,6 +21,8 @@ import android.os.PerfettoTrace
 import android.os.SystemProperties
 import android.os.Trace
 import android.util.Log
+import com.android.app.tracing.coroutines.DebugSysProps.coroutineTracingEnabled
+import com.android.systemui.util.Compile
 import java.lang.StackWalker.StackFrame
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicInteger
@@ -51,14 +53,28 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
  */
 @PublishedApi internal val traceThreadLocal: TraceDataThreadLocal = TraceDataThreadLocal()
 
+@PublishedApi
 internal object DebugSysProps {
     @JvmField
-    val alwaysEnableStackWalker =
-        SystemProperties.getBoolean("debug.coroutine_tracing.walk_stack_override", false)
+    val coroutineTracingEnabled =
+        Compile.IS_DEBUG &&
+            com.android.systemui.Flags.coroutineTracing() &&
+            SystemProperties.getBoolean("persist.debug.coroutine_tracing", false)
 
     @JvmField
-    val alwaysEnableContinuationCounting =
-        SystemProperties.getBoolean("debug.coroutine_tracing.count_continuations_override", false)
+    val stackWalkerAlwaysEnabled =
+        Compile.IS_DEBUG &&
+            com.android.systemui.Flags.coroutineTracing() &&
+            SystemProperties.getBoolean("persist.debug.coroutine_tracing.walk_stack", true)
+
+    @JvmField
+    val continuationCountingAlwaysEnabled =
+        Compile.IS_DEBUG &&
+            com.android.systemui.Flags.coroutineTracing() &&
+            SystemProperties.getBoolean(
+                "persist.debug.coroutine_tracing.count_continuations",
+                false,
+            )
 }
 
 /**
@@ -84,8 +100,8 @@ internal object DebugSysProps {
  * }
  * ```
  *
- * **NOTE:** The sysprops `debug.coroutine_tracing.walk_stack_override` and
- * `debug.coroutine_tracing.count_continuations_override` can be used to override the parameters
+ * **NOTE:** The sysprops `persist.debug.coroutine_tracing.walk_stack` and
+ * `persist.debug.coroutine_tracing.count_continuations` can be used to override the parameters
  * `walkStackForDefaultNames` and `countContinuations` respectively, forcing them to always be
  * `true`. If the sysprop is `false` (or does not exist), the value of the parameter is passed here
  * is used. If `true`, all calls to [createCoroutineTracingContext] will be overwritten with that
@@ -120,14 +136,17 @@ public fun createCoroutineTracingContext(
     walkStackForDefaultNames: Boolean = false,
     shouldIgnoreClassName: ((String) -> Boolean)? = null,
 ): CoroutineContext {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         TraceContextElement(
             name = name,
             isRoot = true,
             countContinuations =
-                !testMode && (countContinuations || DebugSysProps.alwaysEnableContinuationCounting),
+                !testMode &&
+                    (countContinuations || DebugSysProps.continuationCountingAlwaysEnabled),
             walkStackForDefaultNames =
-                walkStackForDefaultNames || DebugSysProps.alwaysEnableStackWalker,
+                walkStackForDefaultNames || DebugSysProps.stackWalkerAlwaysEnabled,
             shouldIgnoreClassName = shouldIgnoreClassName,
             parentId = null,
             inheritedTracePrefix = if (testMode) "" else null,

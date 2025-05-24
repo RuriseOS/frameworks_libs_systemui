@@ -18,7 +18,9 @@
 
 package com.android.app.tracing.coroutines
 
+import com.android.app.tracing.coroutines.DebugSysProps.coroutineTracingEnabled
 import com.android.app.tracing.traceSection
+import com.android.systemui.util.Compile
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -222,12 +224,20 @@ public inline fun <T, R> R.traceCoroutine(crossinline spanName: () -> String, bl
     // tracing is not active (i.e. when TRACE_TAG_APP is disabled). Otherwise, when the
     // coroutine resumes when tracing is active, we won't know its name.
     try {
-        if (com.android.systemui.Flags.coroutineTracing()) {
+        if (
+            Compile.IS_DEBUG &&
+                com.android.systemui.Flags.coroutineTracing() &&
+                coroutineTracingEnabled
+        ) {
             traceThreadLocal.get()?.beginCoroutineTrace(spanName())
         }
         return block()
     } finally {
-        if (com.android.systemui.Flags.coroutineTracing()) {
+        if (
+            Compile.IS_DEBUG &&
+                com.android.systemui.Flags.coroutineTracing() &&
+                coroutineTracingEnabled
+        ) {
             traceThreadLocal.get()?.endCoroutineTrace()
         }
     }
@@ -242,12 +252,20 @@ public inline fun <T> traceCoroutine(crossinline spanName: () -> String, block: 
     // tracing is not active (i.e. when TRACE_TAG_APP is disabled). Otherwise, when the
     // coroutine resumes when tracing is active, we won't know its name.
     try {
-        if (com.android.systemui.Flags.coroutineTracing()) {
+        if (
+            Compile.IS_DEBUG &&
+                com.android.systemui.Flags.coroutineTracing() &&
+                coroutineTracingEnabled
+        ) {
             traceThreadLocal.get()?.beginCoroutineTrace(spanName())
         }
         return block()
     } finally {
-        if (com.android.systemui.Flags.coroutineTracing()) {
+        if (
+            Compile.IS_DEBUG &&
+                com.android.systemui.Flags.coroutineTracing() &&
+                coroutineTracingEnabled
+        ) {
             traceThreadLocal.get()?.endCoroutineTrace()
         }
     }
@@ -266,10 +284,10 @@ public inline fun <T> traceCoroutine(spanName: String, block: () -> T): T {
 }
 
 /**
- * Returns the passed context if [com.android.systemui.Flags.coroutineTracing] is false. Otherwise,
- * returns a new context by adding [CoroutineTraceName] to the given context. The
- * [CoroutineTraceName] in the passed context will take precedence over the new
- * [CoroutineTraceName].
+ * Returns the given `CoroutineContext` if coroutine tracing is disabled. Otherwise, returns a new
+ * context by adding [CoroutineTraceName] to the given context. If the given [CoroutineTraceName]
+ * already has a [CoroutineTraceName], it will be used instead of the one that would have been
+ * created here, and it will preserve its original name.
  */
 @PublishedApi
 internal inline fun addName(
@@ -277,7 +295,9 @@ internal inline fun addName(
     context: CoroutineContext,
 ): CoroutineContext {
     contract { callsInPlace(spanName, InvocationKind.AT_MOST_ONCE) }
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         CoroutineTraceName(spanName()) + context
     } else {
         context

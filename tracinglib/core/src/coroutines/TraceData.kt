@@ -20,7 +20,9 @@ package com.android.app.tracing.coroutines
 
 import android.os.Trace
 import com.android.app.tracing.beginSlice
+import com.android.app.tracing.coroutines.DebugSysProps.coroutineTracingEnabled
 import com.android.app.tracing.endSlice
+import com.android.systemui.util.Compile
 import java.util.ArrayDeque
 import kotlin.contracts.ExperimentalContracts
 import kotlin.math.max
@@ -38,7 +40,11 @@ private typealias TraceSection = String
 @PublishedApi
 internal class TraceDataThreadLocal : ThreadLocal<TraceStorage?>() {
     override fun initialValue(): TraceStorage? {
-        return if (com.android.systemui.Flags.coroutineTracing()) {
+        return if (
+            Compile.IS_DEBUG &&
+                com.android.systemui.Flags.coroutineTracing() &&
+                coroutineTracingEnabled
+        ) {
             TraceStorage(null)
         } else {
             null
