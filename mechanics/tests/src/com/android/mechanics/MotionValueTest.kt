@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:OptIn(ExperimentalCoroutinesApi::class)
-
 package com.android.mechanics
 
 import android.util.Log
@@ -52,7 +50,6 @@ import com.android.mechanics.testing.input
 import com.android.mechanics.testing.isStable
 import com.android.mechanics.testing.output
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import org.junit.Rule
 import org.junit.Test
@@ -110,6 +107,13 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 1f, value = 1f) }
         ) {
+            animateValueTo(1f, changePerFrame = 0.5f)
+            awaitStable()
+        }
+
+    @Test
+    fun segmentChange_inMaxDirection_zeroDelta() =
+        motion.goldenTest(spec = specBuilder(Mapping.Zero) { fixedValueFromCurrent(0.5f) }) {
             animateValueTo(1f, changePerFrame = 0.5f)
             awaitStable()
         }
@@ -519,7 +523,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             animatedInputSequence(0f, 1f, 1f, 0f, 0f)
         }
 
-        assertThat(wtfLog.loggedFailures).isEmpty()
+        assertThat(wtfLog.hasLoggedFailures()).isFalse()
     }
 
     @Test
@@ -546,8 +550,9 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             animatedInputSequence(0f, 0f)
         }
 
-        assertThat(wtfLog.loggedFailures).hasSize(1)
-        assertThat(wtfLog.loggedFailures.first()).startsWith("Delta between mappings is undefined")
+        val loggedFailures = wtfLog.removeLoggedFailures()
+        assertThat(loggedFailures).hasSize(1)
+        assertThat(loggedFailures.first()).startsWith("Delta between mappings is undefined")
     }
 
     @Test
@@ -569,9 +574,9 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         ) {
             animatedInputSequence(0f, 0.5f, 1f, 1.5f, 2f, 3f)
         }
-        assertThat(wtfLog.loggedFailures).hasSize(1)
-        assertThat(wtfLog.loggedFailures.first())
-            .startsWith("Delta between breakpoints is undefined")
+        val loggedFailures = wtfLog.removeLoggedFailures()
+        assertThat(loggedFailures).hasSize(1)
+        assertThat(loggedFailures.first()).startsWith("Delta between breakpoints is undefined")
     }
 
     @Test
@@ -610,7 +615,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
     }
 
     class WtfLogRule : ExternalResource() {
-        val loggedFailures = mutableListOf<String>()
+        private val loggedFailures = mutableListOf<String>()
 
         private lateinit var oldHandler: TerribleFailureHandler
 
@@ -625,6 +630,20 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
 
         override fun after() {
             Log.setWtfHandler(oldHandler)
+
+            // In eng-builds, some misconfiguration in a MotionValue would cause a crash. However,
+            // in tests (and in production), we want animations to proceed even with such errors.
+            // When a test ends, we should check loggedFailures, if they were expected.
+            assertThat(loggedFailures).isEmpty()
+        }
+
+        fun hasLoggedFailures() = loggedFailures.isNotEmpty()
+
+        fun removeLoggedFailures(): List<String> {
+            if (loggedFailures.isEmpty()) error("loggedFailures is empty")
+            val list = loggedFailures.toList()
+            loggedFailures.clear()
+            return list
         }
     }
 
