@@ -60,6 +60,12 @@ interface IconThemeController {
         sourceHint: SourceHint,
     ): ThemedBitmap
 
+    /**
+     * Creates an adaptive icon representation of the themed bitmap for various surface effects. The
+     * controller can return the [originalIcon] for using an un-themed icon for these effects or
+     * null to disable any surface effects in which can the static themed icon will be used without
+     * any additional effects.
+     */
     fun createThemedAdaptiveIcon(
         context: Context,
         originalIcon: AdaptiveIconDrawable,
