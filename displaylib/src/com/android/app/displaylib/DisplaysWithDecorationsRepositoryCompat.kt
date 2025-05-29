@@ -16,6 +16,7 @@
 
 package com.android.app.displaylib
 
+import com.android.app.tracing.TraceUtils.traceAsync
 import com.android.internal.annotations.GuardedBy
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -52,7 +53,6 @@ constructor(
     private val bgApplicationScope: CoroutineScope,
     private val displayRepository: DisplaysWithDecorationsRepository,
 ) {
-
     private val mutex = Mutex()
     private var collectorJob: Job? = null
     private val displayDecorationListenersWithDispatcher =
@@ -69,14 +69,17 @@ constructor(
         listener: DisplayDecorationListener,
         dispatcher: CoroutineDispatcher,
     ) {
+        var initialDisplayIdsForListener: Set<Int> = emptySet()
         bgApplicationScope.launch {
             mutex.withLock {
                 displayDecorationListenersWithDispatcher[listener] = dispatcher
-                // Emit all the existing displays with decorations when registering.
-                displayRepository.displayIdsWithSystemDecorations.value.forEach { displayId ->
-                    withContext(dispatcher) { listener.onDisplayAddSystemDecorations(displayId) }
-                }
-                startCollectingIfNeeded()
+                initialDisplayIdsForListener =
+                    displayRepository.displayIdsWithSystemDecorations.value
+                startCollectingIfNeeded(initialDisplayIdsForListener)
+            }
+            // Emit all the existing displays with decorations when registering.
+            initialDisplayIdsForListener.forEach { displayId ->
+                withContext(dispatcher) { listener.onDisplayAddSystemDecorations(displayId) }
             }
         }
     }
@@ -87,24 +90,24 @@ constructor(
      * @param listener The listener to unregister.
      */
     fun unregisterDisplayDecorationListener(listener: DisplayDecorationListener) {
-        bgApplicationScope.launch {
-            mutex.withLock {
-                displayDecorationListenersWithDispatcher.remove(listener)
-                // stop collecting if no listeners
-                if (displayDecorationListenersWithDispatcher.isEmpty()) {
-                    collectorJob?.cancel()
-                    collectorJob = null
+            bgApplicationScope.launch {
+                mutex.withLock {
+                    displayDecorationListenersWithDispatcher.remove(listener)
+                    // stop collecting if no listeners
+                    if (displayDecorationListenersWithDispatcher.isEmpty()) {
+                        collectorJob?.cancel()
+                        collectorJob = null
+                    }
                 }
             }
-        }
     }
 
     @GuardedBy("mutex")
-    private fun startCollectingIfNeeded() {
+    private fun startCollectingIfNeeded(lastDisplaysWithDecorations: Set<Int>) {
         if (collectorJob?.isActive == true) {
             return
         }
-        var oldDisplays: Set<Int> = displayRepository.displayIdsWithSystemDecorations.value
+        var oldDisplays: Set<Int> = lastDisplaysWithDecorations
         collectorJob =
             bgApplicationScope.launch {
                 displayRepository.displayIdsWithSystemDecorations.collect { currentDisplays ->
