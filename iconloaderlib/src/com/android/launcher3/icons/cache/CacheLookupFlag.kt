@@ -16,7 +16,7 @@
 package com.android.launcher3.icons.cache
 
 import androidx.annotation.IntDef
-import com.android.launcher3.Flags
+import com.android.systemui.shared.Flags.extendibleThemeManager
 import kotlin.annotation.AnnotationRetention.SOURCE
 
 /** Flags to control cache lookup behavior */
@@ -61,7 +61,7 @@ data class CacheLookupFlag private constructor(@LookupFlag private val flag: Int
     fun isVisuallyLessThan(other: CacheLookupFlag) =
         when {
             useLowRes() && !other.useLowRes() -> true
-            Flags.extendibleThemeManager() && !hasThemeIcon() && other.hasThemeIcon() -> true
+            extendibleThemeManager() && !hasThemeIcon() && other.hasThemeIcon() -> true
             else -> false
         }
 
