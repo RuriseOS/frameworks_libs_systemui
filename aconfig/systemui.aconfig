@@ -152,6 +152,16 @@ flag {
 }
 
 flag {
+    name: "smartspace_weather_use_monochrome_font_icons"
+    namespace: "systemui"
+    description: "Update Smartspace to use monochrome font icons for weather"
+    bug: "389957594"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "smartspace_ui_update_resources"
     namespace: "systemui"
     description: "Read-only flag for updating resources for Smartspace UI"
