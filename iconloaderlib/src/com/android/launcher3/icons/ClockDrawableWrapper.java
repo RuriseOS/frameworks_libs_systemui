@@ -349,7 +349,7 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
         private final float mCanvasScale;
 
         ClockIconDrawable(ClockConstantState cs) {
-            super(cs.mBitmapInfo);
+            super(cs.getBitmapInfo());
             mBoundsOffset = cs.mBoundsOffset;
             mAnimInfo = cs.mAnimInfo;
 
@@ -412,10 +412,11 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
         @Override
         protected void updateFilter() {
             super.updateFilter();
-            int alpha = mIsDisabled ? (int) (mDisabledAlpha * FULLY_OPAQUE) : FULLY_OPAQUE;
+            boolean isDisabled = isDisabled();
+            int alpha = isDisabled ? (int) (disabledAlpha * FULLY_OPAQUE) : FULLY_OPAQUE;
             setAlpha(alpha);
-            mBgPaint.setColorFilter(mIsDisabled ? getDisabledColorFilter() : mBgFilter);
-            mFG.setColorFilter(mIsDisabled ? getDisabledColorFilter() : null);
+            mBgPaint.setColorFilter(isDisabled ? getDisabledColorFilter() : mBgFilter);
+            mFG.setColorFilter(isDisabled ? getDisabledColorFilter() : null);
         }
 
         @Override
@@ -455,7 +456,7 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
 
         @Override
         public FastBitmapConstantState newConstantState() {
-            return new ClockConstantState(mBitmapInfo, mThemedFgColor, mBoundsOffset,
+            return new ClockConstantState(bitmapInfo, mThemedFgColor, mBoundsOffset,
                     mAnimInfo, mBG, mBgPaint.getColorFilter());
         }
 
