@@ -122,7 +122,7 @@ class MonoIconThemeController(
         context: Context,
         originalIcon: AdaptiveIconDrawable,
         info: BitmapInfo?,
-    ): AdaptiveIconDrawable? {
+    ): AdaptiveIconDrawable {
         val colors = colorProvider(context)
         originalIcon.mutate()
         var monoDrawable = originalIcon.monochrome?.apply { setTint(colors[1]) }
@@ -146,6 +146,7 @@ class MonoIconThemeController(
         }
 
         return monoDrawable?.let { AdaptiveIconDrawable(ColorDrawable(colors[0]), it) }
+            ?: originalIcon
     }
 
     class ClippedMonoDrawable(base: Drawable?, private val shapePath: Path) :

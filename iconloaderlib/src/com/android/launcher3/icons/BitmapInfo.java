@@ -24,6 +24,8 @@ import android.graphics.Canvas;
 import android.graphics.Path;
 import android.graphics.drawable.Drawable;
 
+import androidx.annotation.ColorRes;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -189,8 +191,8 @@ public class BitmapInfo {
     protected void applyFlags(Context context, FastBitmapDrawable drawable,
             @DrawableCreationFlags int creationFlags, @Nullable Path badgeShape) {
         this.creationFlags = creationFlags;
-        drawable.mDisabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f);
-        drawable.mCreationFlags = creationFlags;
+        drawable.disabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f);
+        drawable.creationFlags = creationFlags;
         if ((creationFlags & FLAG_NO_BADGE) == 0) {
             Drawable badge = getBadgeDrawable(context, (creationFlags & FLAG_THEMED) != 0,
                     (creationFlags & FLAG_SKIP_USER_BADGE) != 0, badgeShape);
@@ -210,7 +212,6 @@ public class BitmapInfo {
     public Drawable getBadgeDrawable(Context context, boolean isThemed, @Nullable Path badgeShape) {
         return getBadgeDrawable(context, isThemed, false, badgeShape);
     }
-
 
     /**
      * Creates a Drawable for an icon badge for this BitmapInfo
@@ -232,18 +233,12 @@ public class BitmapInfo {
         }
         if (skipUserBadge) {
             return null;
-        } else if ((flags & FLAG_INSTANT) != 0) {
-            return new UserBadgeDrawable(context, R.drawable.ic_instant_app_badge,
-                    R.color.badge_tint_instant, isThemed, badgeShape);
-        } else if ((flags & FLAG_WORK) != 0) {
-            return new UserBadgeDrawable(context, R.drawable.ic_work_app_badge,
-                    R.color.badge_tint_work, isThemed, badgeShape);
-        } else if ((flags & FLAG_CLONE) != 0) {
-            return new UserBadgeDrawable(context, R.drawable.ic_clone_app_badge,
-                    R.color.badge_tint_clone, isThemed, badgeShape);
-        } else if ((flags & FLAG_PRIVATE) != 0) {
-            return new UserBadgeDrawable(context, R.drawable.ic_private_profile_app_badge,
-                    R.color.badge_tint_private, isThemed, badgeShape);
+        } else {
+            BadgeDrawableInfo drawableInfo = getBadgeDrawableInfo();
+            if (drawableInfo != null) {
+                return new UserBadgeDrawable(context, drawableInfo.drawableRes,
+                        drawableInfo.colorRes, isThemed, badgeShape);
+            }
         }
         return null;
     }
@@ -254,6 +249,26 @@ public class BitmapInfo {
 
     public static BitmapInfo of(@NonNull Bitmap bitmap, int color) {
         return new BitmapInfo(bitmap, color);
+    }
+
+    /**
+     * Returns information about the badge to apply based on current flags.
+     */
+    @Nullable
+    public BadgeDrawableInfo getBadgeDrawableInfo() {
+        if ((flags & FLAG_INSTANT) != 0) {
+            return new BadgeDrawableInfo(R.drawable.ic_instant_app_badge,
+                    R.color.badge_tint_instant);
+        } else if ((flags & FLAG_WORK) != 0) {
+            return new BadgeDrawableInfo(R.drawable.ic_work_app_badge, R.color.badge_tint_work);
+        } else if ((flags & FLAG_CLONE) != 0) {
+            return new BadgeDrawableInfo(R.drawable.ic_clone_app_badge, R.color.badge_tint_clone);
+        } else if ((flags & FLAG_PRIVATE) != 0) {
+            return new BadgeDrawableInfo(R.drawable.ic_private_profile_app_badge,
+                    R.color.badge_tint_private);
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -272,4 +287,14 @@ public class BitmapInfo {
          */
         void drawForPersistence(Canvas canvas);
     }
+
+    /**
+     * Drawables backing a specific badge shown on app icons.
+     * @param drawableRes Drawable resource for the badge.
+     * @param colorRes Color resource to tint the badge.
+     */
+    public record BadgeDrawableInfo(
+            @DrawableRes int drawableRes,
+            @ColorRes int colorRes
+    ) {}
 }
