@@ -52,7 +52,7 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
     @JvmField @VisibleForTesting var isPressed: Boolean = false
     @JvmField @VisibleForTesting var isHovered: Boolean = false
 
-    @JvmField protected var disabledAlpha: Float = 1f
+    @JvmField var disabledAlpha: Float = 1f
 
     var isDisabled: Boolean = false
         set(value) {
