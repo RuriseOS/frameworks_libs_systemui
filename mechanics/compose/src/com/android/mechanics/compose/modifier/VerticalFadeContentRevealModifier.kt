@@ -25,7 +25,6 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
-import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
@@ -173,10 +172,6 @@ internal class FadeContentRevealNode(
     }
 
     override fun isMeasurementApproachInProgress(lookaheadSize: IntSize) = isAnimating()
-
-    override fun Placeable.PlacementScope.isPlacementApproachInProgress(
-        lookaheadCoordinates: LayoutCoordinates
-    ) = isAnimating()
 
     private var targetBounds = Rect.Zero
 
