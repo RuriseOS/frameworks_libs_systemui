@@ -275,7 +275,7 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
         ClockBitmapInfo(Bitmap icon, int color, float scale,
                 AnimationInfo animInfo, Bitmap background,
                 AnimationInfo themeInfo, Bitmap themeBackground) {
-            super(icon, color);
+            super(icon, color, /* flags */ 0, /* themedBitmap */ null);
             this.boundsOffset = Math.max(ShadowGenerator.BLUR_FACTOR, (1 - scale) / 2);
             this.animInfo = animInfo;
             this.mFlattenedBackground = background;
@@ -286,7 +286,7 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
         @Override
         @TargetApi(Build.VERSION_CODES.TIRAMISU)
         public FastBitmapDrawable newIcon(Context context,
-                @DrawableCreationFlags  int creationFlags, Path badgeShape) {
+                @DrawableCreationFlags int creationFlags, Path badgeShape) {
             AnimationInfo info;
             Bitmap bg;
             int themedFgColor;
@@ -322,8 +322,9 @@ public class ClockDrawableWrapper extends AdaptiveIconDrawable implements Bitmap
 
         @Override
         public BitmapInfo clone() {
-            return copyInternalsTo(new ClockBitmapInfo(icon, color, 1 - 2 * boundsOffset, animInfo,
-                    mFlattenedBackground, themeData, themeBackground));
+            return copyInternalsTo(new ClockBitmapInfo(icon, color,
+                    1 - 2 * boundsOffset, animInfo, mFlattenedBackground,
+                    themeData, themeBackground));
         }
 
         @Override
