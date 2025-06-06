@@ -6,6 +6,7 @@ import static android.graphics.Paint.DITHER_FLAG;
 import static android.graphics.Paint.FILTER_BITMAP_FLAG;
 import static android.graphics.drawable.AdaptiveIconDrawable.getExtraInsetFraction;
 
+import static com.android.launcher3.icons.BitmapInfo.FLAG_FULL_BLEED;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_INSTANT;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR;
@@ -86,6 +87,7 @@ public class BaseIconFactory implements AutoCloseable {
     @NonNull
     private final PackageManager mPm;
 
+    public final boolean mDrawFullBleedIcons;
     protected final int mFullResIconDpi;
     protected final int mIconBitmapSize;
 
@@ -103,15 +105,16 @@ public class BaseIconFactory implements AutoCloseable {
 
     private static int PLACEHOLDER_BACKGROUND_COLOR = Color.rgb(245, 245, 245);
 
-    protected BaseIconFactory(Context context, int fullResIconDpi, int iconBitmapSize,
-            boolean unused) {
-        this(context, fullResIconDpi, iconBitmapSize);
+    public BaseIconFactory(Context context, int fullResIconDpi, int iconBitmapSize) {
+        this(context, fullResIconDpi, iconBitmapSize, /* drawFullBleedIcons */ false);
     }
 
-    public BaseIconFactory(Context context, int fullResIconDpi, int iconBitmapSize) {
+    public BaseIconFactory(Context context, int fullResIconDpi, int iconBitmapSize,
+            boolean drawFullBleedIcons) {
         mContext = context.getApplicationContext();
         mFullResIconDpi = fullResIconDpi;
         mIconBitmapSize = iconBitmapSize;
+        mDrawFullBleedIcons = drawFullBleedIcons;
 
         mPm = mContext.getPackageManager();
 
@@ -171,7 +174,7 @@ public class BaseIconFactory implements AutoCloseable {
                 new ColorDrawable(PLACEHOLDER_BACKGROUND_COLOR),
                 new CenterTextDrawable(placeholder, color));
         Bitmap icon = createIconBitmap(drawable, ICON_VISIBLE_AREA_FACTOR);
-        return BitmapInfo.of(icon, color);
+        return BitmapInfo.of(icon, color, getDefaultIconShape());
     }
 
     public BitmapInfo createIconBitmap(Bitmap icon) {
@@ -179,7 +182,8 @@ public class BaseIconFactory implements AutoCloseable {
             icon = createIconBitmap(new BitmapDrawable(mContext.getResources(), icon), 1f);
         }
 
-        return BitmapInfo.of(icon, ColorExtractor.findDominantColorByHue(icon));
+        return BitmapInfo.of(icon, ColorExtractor.findDominantColorByHue(icon),
+                getDefaultIconShape());
     }
 
     /**
@@ -223,10 +227,12 @@ public class BaseIconFactory implements AutoCloseable {
         }
         AdaptiveIconDrawable adaptiveIcon = normalizeAndWrapToAdaptiveIcon(tempIcon, scale);
         Bitmap bitmap = createIconBitmap(adaptiveIcon, scale[0],
-                options == null ? MODE_WITH_SHADOW : options.mGenerationMode);
+                options == null ? MODE_WITH_SHADOW : options.mGenerationMode, mDrawFullBleedIcons);
         int color = (options != null && options.mExtractedColor != null)
                 ? options.mExtractedColor : ColorExtractor.findDominantColorByHue(bitmap);
-        BitmapInfo info = BitmapInfo.of(bitmap, color);
+
+        BitmapInfo info = BitmapInfo.of(bitmap, color, getDefaultIconShape());
+        if (mDrawFullBleedIcons) info.flags |= FLAG_FULL_BLEED;
 
         if (adaptiveIcon instanceof Extender extender) {
             info = extender.getExtendedInfo(bitmap, color, this, scale[0]);
@@ -246,6 +252,18 @@ public class BaseIconFactory implements AutoCloseable {
         }
         info = info.withFlags(flagOp);
         return info;
+    }
+
+    /**
+     * Generates an IconShape based on the current bitmap size and default icon mask.
+     */
+    public IconShape getDefaultIconShape() {
+        if (!mDrawFullBleedIcons) return IconShape.EMPTY;
+        AdaptiveIconDrawable tempAdaptiveIcon =
+                new AdaptiveIconDrawable(new ColorDrawable(BLACK), null);
+        tempAdaptiveIcon.setBounds(0, 0, mIconBitmapSize, mIconBitmapSize);
+        return new IconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask(),
+                getWhiteShadowLayer());
     }
 
     @NonNull
@@ -340,7 +358,7 @@ public class BaseIconFactory implements AutoCloseable {
     public Bitmap createScaledBitmap(@NonNull Drawable icon, @BitmapGenerationMode int mode) {
         float[] scale = new float[1];
         icon = normalizeAndWrapToAdaptiveIcon(icon, scale);
-        return createIconBitmap(icon, Math.min(scale[0], ICON_SCALE_FOR_SHADOWS), mode);
+        return createIconBitmap(icon, Math.min(scale[0], ICON_SCALE_FOR_SHADOWS), mode, false);
     }
 
     /**
@@ -397,12 +415,12 @@ public class BaseIconFactory implements AutoCloseable {
 
     @NonNull
     public Bitmap createIconBitmap(@Nullable final Drawable icon, final float scale) {
-        return createIconBitmap(icon, scale, MODE_DEFAULT);
+        return createIconBitmap(icon, scale, MODE_DEFAULT, mDrawFullBleedIcons);
     }
 
     @NonNull
     public Bitmap createIconBitmap(@Nullable final Drawable icon, final float scale,
-            @BitmapGenerationMode int bitmapGenerationMode) {
+            @BitmapGenerationMode int bitmapGenerationMode, boolean isFullBleed) {
         final int size = mIconBitmapSize;
         final Bitmap bitmap;
         switch (bitmapGenerationMode) {
@@ -412,7 +430,8 @@ public class BaseIconFactory implements AutoCloseable {
             case MODE_HARDWARE:
             case MODE_HARDWARE_WITH_SHADOW: {
                 return BitmapRenderer.createHardwareBitmap(size, size, canvas ->
-                        drawIconBitmap(canvas, icon, scale, bitmapGenerationMode, null));
+                        drawIconBitmap(canvas, icon, scale, bitmapGenerationMode, null,
+                                isFullBleed));
             }
             case MODE_WITH_SHADOW:
             default:
@@ -423,36 +442,42 @@ public class BaseIconFactory implements AutoCloseable {
             return bitmap;
         }
         mCanvas.setBitmap(bitmap);
-        drawIconBitmap(mCanvas, icon, scale, bitmapGenerationMode, bitmap);
+        drawIconBitmap(mCanvas, icon, scale, bitmapGenerationMode, bitmap, isFullBleed);
         mCanvas.setBitmap(null);
         return bitmap;
     }
 
     private void drawIconBitmap(@NonNull Canvas canvas, @Nullable Drawable icon,
             final float scale, @BitmapGenerationMode int bitmapGenerationMode,
-            @Nullable Bitmap targetBitmap) {
+            @Nullable Bitmap targetBitmap, boolean isFullBleed) {
         final int size = mIconBitmapSize;
         mOldBounds.set(icon.getBounds());
+        boolean isFullBleedEnabled = isFullBleed
+                && Flags.enableLauncherIconShapes();
         if (icon instanceof AdaptiveIconDrawable aid) {
             // We are ignoring KEY_SHADOW_DISTANCE because regular icons ignore this at the
             // moment b/298203449
-            int offset = Math.max((int) Math.ceil(BLUR_FACTOR * size),
-                    Math.round(size * (1 - scale) / 2));
+            int offset = isFullBleedEnabled
+                    ? 0
+                    : Math.max((int) Math.ceil(BLUR_FACTOR * size),
+                            Math.round(size * (1 - scale) / 2));
             // b/211896569: AdaptiveIconDrawable do not work properly for non top-left bounds
             int newBounds = size - offset * 2;
             icon.setBounds(0, 0, newBounds, newBounds);
-            Path shapePath = getShapePath(aid, icon.getBounds());
             int count = canvas.save();
             canvas.translate(offset, offset);
-            if (bitmapGenerationMode == MODE_WITH_SHADOW
-                    || bitmapGenerationMode == MODE_HARDWARE_WITH_SHADOW) {
-                getShadowGenerator().addPathShadow(shapePath, canvas);
+
+            if ((bitmapGenerationMode == MODE_WITH_SHADOW
+                    || bitmapGenerationMode == MODE_HARDWARE_WITH_SHADOW)
+                    && !isFullBleedEnabled) {
+                getShadowGenerator().addPathShadow(aid.getIconMask(), canvas);
             }
 
             if (icon instanceof Extender) {
                 ((Extender) icon).drawForPersistence(canvas);
             } else {
-                drawAdaptiveIcon(canvas, aid, shapePath);
+                drawAdaptiveIcon(canvas, aid, isFullBleedEnabled,
+                        getShapePath(aid, icon.getBounds()));
             }
 
             canvas.restoreToCount(count);
@@ -508,8 +533,11 @@ public class BaseIconFactory implements AutoCloseable {
      * @param canvas    canvas to draw on
      * @param drawable  AdaptiveIconDrawable to draw
      * @param shapePath path to clip icon with for shapes
+     *
+     * @deprecated b/421884219 use mDrawFullBleedIcons and shape it using {@link IconShape} instead
      */
-    protected void drawAdaptiveIcon(
+    @Deprecated
+    private void drawShapedAdaptiveIcon(
             @NonNull Canvas canvas,
             @NonNull AdaptiveIconDrawable drawable,
             @NonNull Path shapePath
@@ -524,6 +552,44 @@ public class BaseIconFactory implements AutoCloseable {
         Paint paint = new Paint();
         paint.setShader(new BitmapShader(shaderBitmap, TileMode.CLAMP, TileMode.CLAMP));
         canvas.drawPath(shapePath, paint);
+    }
+
+    /**
+     * Draws AdaptiveIconDrawable onto canvas with either default shape, or
+     * as Full-bleed.
+     *
+     * @param canvas    canvas to draw on
+     * @param drawable  AdaptiveIconDrawable to draw
+     * @param isFullBleed whether to draw as full-bleed.
+     */
+    private void drawAdaptiveIcon(
+            @NonNull Canvas canvas,
+            @NonNull AdaptiveIconDrawable drawable,
+            boolean isFullBleed,
+            Path shape
+    ) {
+        Drawable background = drawable.getBackground();
+        Drawable foreground = drawable.getForeground();
+        boolean shouldNotDrawFullBleed = !isFullBleed || (background == null && foreground == null);
+        if (shouldNotDrawFullBleed) {
+            boolean shouldDrawDefaultShape = !isFullBleed && mDrawFullBleedIcons;
+            // TODO: b/421884219 Temporarily keep old icon shape implementation until migrated
+            if (shouldDrawDefaultShape) {
+                // New Icon shapes path, used for non-full bleed icons
+                drawable.draw(canvas);
+            } else {
+                // Old Icon shapes path, to get old shape effect if mDrawFullBleedIcons is false
+                drawShapedAdaptiveIcon(canvas, drawable, shape);
+            }
+            return;
+        }
+        canvas.drawColor(Color.BLACK);
+        if (background != null) {
+            background.draw(canvas);
+        }
+        if (foreground != null) {
+            foreground.draw(canvas);
+        }
     }
 
     @Override

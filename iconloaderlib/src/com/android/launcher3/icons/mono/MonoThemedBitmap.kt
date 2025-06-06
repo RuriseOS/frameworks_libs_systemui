@@ -20,6 +20,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
+import com.android.launcher3.icons.IconShape
 import com.android.launcher3.icons.ThemedBitmap
 import java.nio.ByteBuffer
 
@@ -33,6 +34,7 @@ class MonoThemedBitmap(
         val colors = colorProvider(context)
         return FastBitmapDrawable(
             info,
+            IconShape.EMPTY, // TODO: update for themed icons
             ThemedIconInfo(mono, whiteShadowLayer, colors[0], colors[1]),
         )
     }

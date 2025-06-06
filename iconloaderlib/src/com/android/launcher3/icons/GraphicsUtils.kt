@@ -19,7 +19,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat.PNG
 import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Region
 import android.graphics.RegionIterator
 import android.util.Log
@@ -95,5 +98,28 @@ object GraphicsUtils {
         val saveCount = save()
         block.invoke(this)
         restoreToCount(saveCount)
+    }
+
+    /** Resizes given IconShape to [newSize] as a new instance of IconShape. */
+    @JvmStatic
+    fun IconShape.resize(newSize: Float): IconShape {
+        val transformedPath = resizePath(path, pathSize, newSize)
+        return IconShape(newSize, transformedPath, shadowLayer)
+    }
+
+    /** Resizes given [basePath] from [oldSize] to [newSize] as a new instance of Path. */
+    @JvmStatic
+    fun resizePath(basePath: Path, oldSize: Float, newSize: Float): Path {
+        return Path(basePath).apply {
+            transform(
+                Matrix().apply {
+                    setRectToRect(
+                        RectF(0f, 0f, oldSize, oldSize),
+                        RectF(0f, 0f, newSize, newSize),
+                        Matrix.ScaleToFit.CENTER,
+                    )
+                }
+            )
+        }
     }
 }
