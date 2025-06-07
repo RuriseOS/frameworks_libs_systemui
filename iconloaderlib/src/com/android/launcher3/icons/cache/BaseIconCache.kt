@@ -42,10 +42,11 @@ import android.util.SparseArray
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
 import com.android.launcher3.Flags
+import com.android.systemui.shared.Flags.extendibleThemeManager
 import com.android.launcher3.icons.BaseIconFactory
 import com.android.launcher3.icons.BaseIconFactory.IconOptions
 import com.android.launcher3.icons.BitmapInfo
-import com.android.launcher3.icons.BitmapInfo.LOW_RES_ICON
+import com.android.launcher3.icons.BitmapInfo.Companion.LOW_RES_ICON
 import com.android.launcher3.icons.GraphicsUtils
 import com.android.launcher3.icons.IconProvider
 import com.android.launcher3.icons.SourceHint
@@ -54,7 +55,6 @@ import com.android.launcher3.icons.cache.CacheLookupFlag.Companion.DEFAULT_LOOKU
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.FlagOp
 import com.android.launcher3.util.SQLiteCacheHelper
-import com.android.systemui.shared.Flags.extendibleThemeManager
 import java.util.function.Supplier
 import kotlin.collections.MutableMap.MutableEntry
 

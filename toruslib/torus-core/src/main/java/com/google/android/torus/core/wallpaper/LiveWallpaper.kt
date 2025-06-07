@@ -434,6 +434,17 @@ abstract class LiveWallpaper : WallpaperService() {
             return super.onCommand(action, x, y, z, extras, resultRequested)
         }
 
+        override fun onAmbientModeChanged(inAmbientMode: Boolean, animationDuration: Long) {
+            super.onAmbientModeChanged(inAmbientMode, animationDuration)
+
+            if (wallpaperEngine is LiveWallpaperEventListener) {
+                (wallpaperEngine as LiveWallpaperEventListener).onAmbientModeChanged(
+                    inAmbientMode,
+                    animationDuration,
+                )
+            }
+        }
+
         override fun onTouchEvent(event: MotionEvent) {
             super.onTouchEvent(event)
 

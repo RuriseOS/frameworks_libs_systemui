@@ -86,7 +86,7 @@ internal constructor(private val context: Context, executor: Executor) :
     override fun onCapturedViewPropertiesBg(
         elapsedRealtimeNanos: Long,
         windowName: String,
-        startFlattenedTree: ViewPropertyRef
+        startFlattenedTree: ViewPropertyRef,
     ) {
         Trace.beginSection("vc#onCapturedViewPropertiesBg")
 
@@ -99,7 +99,7 @@ internal constructor(private val context: Context, executor: Executor) :
                 windowName,
                 startFlattenedTree,
                 ctx.incrementalState,
-                newInternedStrings
+                newInternedStrings,
             )
             serializeIncrementalState(os, ctx.incrementalState, newInternedStrings)
         }
@@ -112,7 +112,7 @@ internal constructor(private val context: Context, executor: Executor) :
         windowName: String,
         startFlattenedTree: ViewPropertyRef,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ) {
         mSerializationCurrentView = startFlattenedTree
         mSerializationCurrentId = 0
@@ -121,11 +121,11 @@ internal constructor(private val context: Context, executor: Executor) :
         val tokenViewCapture = os.start(WinscopeExtensionsImpl.VIEWCAPTURE)
         os.write(
             ViewCaptureMessage.PACKAGE_NAME_IID,
-            internPackageName(context.packageName, incrementalState, newInternedStrings)
+            internPackageName(context.packageName, incrementalState, newInternedStrings),
         )
         os.write(
             ViewCaptureMessage.WINDOW_NAME_IID,
-            internWindowName(windowName, incrementalState, newInternedStrings)
+            internWindowName(windowName, incrementalState, newInternedStrings),
         )
         serializeViewsRec(os, -1, incrementalState, newInternedStrings)
         os.end(tokenViewCapture)
@@ -136,7 +136,7 @@ internal constructor(private val context: Context, executor: Executor) :
         os: ProtoOutputStream,
         parentId: Int,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ) {
         if (mSerializationCurrentView == null) {
             return
@@ -151,7 +151,7 @@ internal constructor(private val context: Context, executor: Executor) :
             mSerializationCurrentId,
             parentId,
             incrementalState,
-            newInternedStrings
+            newInternedStrings,
         )
 
         ++mSerializationCurrentId
@@ -168,7 +168,7 @@ internal constructor(private val context: Context, executor: Executor) :
         id: Int,
         parentId: Int,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ) {
         val token = os.start(ViewCaptureMessage.VIEWS)
 
@@ -177,11 +177,11 @@ internal constructor(private val context: Context, executor: Executor) :
         os.write(ViewCaptureMessage.View.HASHCODE, view.hashCode)
         os.write(
             ViewCaptureMessage.View.VIEW_ID_IID,
-            internViewId(mViewIdProvider.getName(view.id), incrementalState, newInternedStrings)
+            internViewId(mViewIdProvider.getName(view.id), incrementalState, newInternedStrings),
         )
         os.write(
             ViewCaptureMessage.View.CLASS_NAME_IID,
-            internClassName(view.clazz.name, incrementalState, newInternedStrings)
+            internClassName(view.clazz.name, incrementalState, newInternedStrings),
         )
 
         os.write(ViewCaptureMessage.View.LEFT, view.left)
@@ -209,31 +209,31 @@ internal constructor(private val context: Context, executor: Executor) :
     private fun internClassName(
         string: String,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ): Int {
         return internString(
             string,
             incrementalState.mInternMapClassName,
-            newInternedStrings.classNames
+            newInternedStrings.classNames,
         )
     }
 
     private fun internPackageName(
         string: String,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ): Int {
         return internString(
             string,
             incrementalState.mInternMapPackageName,
-            newInternedStrings.packageNames
+            newInternedStrings.packageNames,
         )
     }
 
     private fun internViewId(
         string: String,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ): Int {
         return internString(string, incrementalState.mInternMapViewId, newInternedStrings.viewIds)
     }
@@ -241,19 +241,19 @@ internal constructor(private val context: Context, executor: Executor) :
     private fun internWindowName(
         string: String,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ): Int {
         return internString(
             string,
             incrementalState.mInternMapWindowName,
-            newInternedStrings.windowNames
+            newInternedStrings.windowNames,
         )
     }
 
     private fun internString(
         string: String,
         internMap: MutableMap<String, Int>,
-        newInternedStrings: MutableList<String>
+        newInternedStrings: MutableList<String>,
     ): Int {
         if (internMap.containsKey(string)) {
             return internMap[string]!!
@@ -271,7 +271,7 @@ internal constructor(private val context: Context, executor: Executor) :
     private fun serializeIncrementalState(
         os: ProtoOutputStream,
         incrementalState: ViewCaptureDataSource.IncrementalState,
-        newInternedStrings: NewInternedStrings
+        newInternedStrings: NewInternedStrings,
     ) {
         var flags = TracePacket.SEQ_NEEDS_INCREMENTAL_STATE
         if (!incrementalState.mHasNotifiedClearedState) {
@@ -285,25 +285,25 @@ internal constructor(private val context: Context, executor: Executor) :
             os,
             InternedData.VIEWCAPTURE_CLASS_NAME,
             incrementalState.mInternMapClassName,
-            newInternedStrings.classNames
+            newInternedStrings.classNames,
         )
         serializeInternMap(
             os,
             InternedData.VIEWCAPTURE_PACKAGE_NAME,
             incrementalState.mInternMapPackageName,
-            newInternedStrings.packageNames
+            newInternedStrings.packageNames,
         )
         serializeInternMap(
             os,
             InternedData.VIEWCAPTURE_VIEW_ID,
             incrementalState.mInternMapViewId,
-            newInternedStrings.viewIds
+            newInternedStrings.viewIds,
         )
         serializeInternMap(
             os,
             InternedData.VIEWCAPTURE_WINDOW_NAME,
             incrementalState.mInternMapWindowName,
-            newInternedStrings.windowNames
+            newInternedStrings.windowNames,
         )
         os.end(token)
     }
@@ -312,7 +312,7 @@ internal constructor(private val context: Context, executor: Executor) :
         os: ProtoOutputStream,
         fieldId: Long,
         map: Map<String, Int>,
-        newInternedStrings: List<String>
+        newInternedStrings: List<String>,
     ) {
         if (newInternedStrings.isEmpty()) {
             return
