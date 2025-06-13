@@ -21,6 +21,7 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -29,21 +30,22 @@ import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 
+import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 
 /**
  * Subclass which draws a placeholder icon when the actual icon is not yet loaded
  */
-public class PlaceHolderIconDrawable extends FastBitmapDrawable {
+public class PlaceHolderDrawableDelegate implements FastBitmapDrawableDelegate {
 
     // Path in [0, 100] bounds.
     private final Path mProgressPath;
+    private final Paint mPaint;
 
-    public PlaceHolderIconDrawable(BitmapInfo info, Context context) {
-        super(info);
+    public PlaceHolderDrawableDelegate(BitmapInfo info, Paint paint, int loadingColor) {
         mProgressPath = getDefaultPath();
-        paint.setColor(ColorUtils.compositeColors(
-                GraphicsUtils.getAttrColor(context, R.attr.loadingIconColor), info.color));
+        mPaint = paint;
+        paint.setColor(ColorUtils.compositeColors(loadingColor, info.color));
     }
 
     /**
@@ -58,7 +60,8 @@ public class PlaceHolderIconDrawable extends FastBitmapDrawable {
     }
 
     @Override
-    protected void drawInternal(Canvas canvas, Rect bounds) {
+    public void drawContent(@NonNull BitmapInfo info, @NonNull Canvas canvas, @NonNull Rect bounds,
+            @NonNull Paint paint) {
         int saveCount = canvas.save();
         canvas.translate(bounds.left, bounds.top);
         canvas.scale(bounds.width() / 100f, bounds.height() / 100f);
@@ -68,7 +71,7 @@ public class PlaceHolderIconDrawable extends FastBitmapDrawable {
 
     /** Updates this placeholder to {@code newIcon} with animation. */
     public void animateIconUpdate(Drawable newIcon) {
-        int placeholderColor = paint.getColor();
+        int placeholderColor = mPaint.getColor();
         int originalAlpha = Color.alpha(placeholderColor);
 
         ValueAnimator iconUpdateAnimation = ValueAnimator.ofInt(originalAlpha, 0);
@@ -88,4 +91,20 @@ public class PlaceHolderIconDrawable extends FastBitmapDrawable {
         iconUpdateAnimation.start();
     }
 
+
+    public static class PlaceHolderDelegateFactory implements DelegateFactory {
+
+        private final int mLoadingColor;
+
+        public PlaceHolderDelegateFactory(Context context) {
+            mLoadingColor = GraphicsUtils.getAttrColor(context, R.attr.loadingIconColor);
+        }
+
+        @NonNull
+        @Override
+        public FastBitmapDrawableDelegate newDelegate(@NonNull BitmapInfo bitmapInfo,
+                @NonNull Paint paint, @NonNull FastBitmapDrawable host) {
+            return new PlaceHolderDrawableDelegate(bitmapInfo, paint, mLoadingColor);
+        }
+    }
 }

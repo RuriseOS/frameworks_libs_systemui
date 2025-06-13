@@ -21,18 +21,20 @@ import android.graphics.Bitmap
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
 import com.android.launcher3.icons.ThemedBitmap
-import com.android.launcher3.icons.mono.ThemedIconDrawable.ThemedConstantState
 import java.nio.ByteBuffer
 
 class MonoThemedBitmap(
     val mono: Bitmap,
     private val whiteShadowLayer: Bitmap,
-    private val colorProvider: (Context) -> IntArray = ThemedIconDrawable.Companion::getColors,
+    private val colorProvider: (Context) -> IntArray = ThemedIconDelegate.Companion::getColors,
 ) : ThemedBitmap {
 
     override fun newDrawable(info: BitmapInfo, context: Context): FastBitmapDrawable {
         val colors = colorProvider(context)
-        return ThemedConstantState(info, mono, whiteShadowLayer, colors[0], colors[1]).newDrawable()
+        return FastBitmapDrawable(
+            info,
+            ThemedIconInfo(mono, whiteShadowLayer, colors[0], colors[1]),
+        )
     }
 
     override fun serialize() =

@@ -23,6 +23,7 @@ import android.graphics.drawable.Drawable
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.IntDef
+import com.android.launcher3.icons.PlaceHolderDrawableDelegate.PlaceHolderDelegateFactory
 import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.util.FlagOp
 
@@ -110,7 +111,7 @@ open class BitmapInfo(
     ): FastBitmapDrawable {
         val drawable: FastBitmapDrawable =
             if (isLowRes) {
-                PlaceHolderIconDrawable(this, context)
+                FastBitmapDrawable(this, PlaceHolderDelegateFactory(context))
             } else if (
                 (creationFlags and FLAG_THEMED) != 0 &&
                     themedBitmap != null &&
@@ -125,17 +126,22 @@ open class BitmapInfo(
     }
 
     protected fun applyFlags(
-        context: Context, drawable: FastBitmapDrawable,
-        @DrawableCreationFlags creationFlags: Int, badgeShape: Path?
+        context: Context,
+        drawable: FastBitmapDrawable,
+        @DrawableCreationFlags creationFlags: Int,
+        badgeShape: Path?,
     ) {
         this.creationFlags = creationFlags
         drawable.disabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f)
         drawable.creationFlags = creationFlags
         if ((creationFlags and FLAG_NO_BADGE) == 0) {
-            val badge = getBadgeDrawable(
-                context, (creationFlags and FLAG_THEMED) != 0,
-                (creationFlags and FLAG_SKIP_USER_BADGE) != 0, badgeShape
-            )
+            val badge =
+                getBadgeDrawable(
+                    context,
+                    (creationFlags and FLAG_THEMED) != 0,
+                    (creationFlags and FLAG_SKIP_USER_BADGE) != 0,
+                    badgeShape,
+                )
             if (badge != null) {
                 drawable.badge = badge
             }
@@ -156,6 +162,7 @@ open class BitmapInfo(
 
     /**
      * Creates a Drawable for an icon badge for this BitmapInfo
+     *
      * @param context Context
      * @param isThemed If the drawable is themed.
      * @param skipUserBadge If should skip User Profile badging.
@@ -163,7 +170,10 @@ open class BitmapInfo(
      * @return Drawable for an icon Badge.
      */
     private fun getBadgeDrawable(
-        context: Context, isThemed: Boolean, skipUserBadge: Boolean, badgeShape: Path?
+        context: Context,
+        isThemed: Boolean,
+        skipUserBadge: Boolean,
+        badgeShape: Path?,
     ): Drawable? {
         if (badgeInfo != null) {
             var creationFlag = if (isThemed) FLAG_THEMED else 0
@@ -176,43 +186,29 @@ open class BitmapInfo(
             return null
         } else {
             getBadgeDrawableInfo()?.let {
-                return UserBadgeDrawable(
-                    context,
-                    it.drawableRes,
-                    it.colorRes,
-                    isThemed,
-                    badgeShape
-                )
+                return UserBadgeDrawable(context, it.drawableRes, it.colorRes, isThemed, badgeShape)
             }
         }
         return null
     }
 
-    /**
-     * Returns information about the badge to apply based on current flags.
-     */
+    /** Returns information about the badge to apply based on current flags. */
     fun getBadgeDrawableInfo(): BadgeDrawableInfo? {
         return when {
-            (flags and FLAG_INSTANT) != 0 -> BadgeDrawableInfo(
-                R.drawable.ic_instant_app_badge,
-                R.color.badge_tint_instant
-            )
-            (flags and FLAG_WORK) != 0 -> BadgeDrawableInfo(
-                R.drawable.ic_work_app_badge,
-                R.color.badge_tint_work
-            )
-            (flags and FLAG_CLONE) != 0 -> BadgeDrawableInfo(
-                R.drawable.ic_clone_app_badge,
-                R.color.badge_tint_clone
-            )
-            (flags and FLAG_PRIVATE) != 0 -> BadgeDrawableInfo(
-                R.drawable.ic_private_profile_app_badge,
-                R.color.badge_tint_private
-            )
+            (flags and FLAG_INSTANT) != 0 ->
+                BadgeDrawableInfo(R.drawable.ic_instant_app_badge, R.color.badge_tint_instant)
+            (flags and FLAG_WORK) != 0 ->
+                BadgeDrawableInfo(R.drawable.ic_work_app_badge, R.color.badge_tint_work)
+            (flags and FLAG_CLONE) != 0 ->
+                BadgeDrawableInfo(R.drawable.ic_clone_app_badge, R.color.badge_tint_clone)
+            (flags and FLAG_PRIVATE) != 0 ->
+                BadgeDrawableInfo(
+                    R.drawable.ic_private_profile_app_badge,
+                    R.color.badge_tint_private,
+                )
             else -> null
         }
     }
-
 
     /** Interface to be implemented by drawables to provide a custom BitmapInfo */
     interface Extender {
@@ -230,13 +226,14 @@ open class BitmapInfo(
 
     /**
      * Drawables backing a specific badge shown on app icons.
+     *
      * @param drawableRes Drawable resource for the badge.
      * @param colorRes Color resource to tint the badge.
      */
     @JvmRecord
     data class BadgeDrawableInfo(
         @field:DrawableRes @param:DrawableRes val drawableRes: Int,
-        @field:ColorRes @param:ColorRes val colorRes: Int
+        @field:ColorRes @param:ColorRes val colorRes: Int,
     )
 
     companion object {
@@ -254,10 +251,8 @@ open class BitmapInfo(
         const val FLAG_NO_BADGE: Int = 1 shl 1
         const val FLAG_SKIP_USER_BADGE: Int = 1 shl 2
 
-        @JvmField
-        val LOW_RES_ICON: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8)
-        @JvmField
-        val LOW_RES_INFO: BitmapInfo = fromBitmap(LOW_RES_ICON)
+        @JvmField val LOW_RES_ICON: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8)
+        @JvmField val LOW_RES_INFO: BitmapInfo = fromBitmap(LOW_RES_ICON)
 
         @JvmStatic
         fun fromBitmap(bitmap: Bitmap): BitmapInfo {

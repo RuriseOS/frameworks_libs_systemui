@@ -36,11 +36,17 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.Interpolator
 import android.view.animation.PathInterpolator
 import androidx.annotation.VisibleForTesting
-import androidx.core.graphics.ColorUtils
 import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.SimpleDelegateFactory
 import kotlin.math.min
 
-open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
+class FastBitmapDrawable
+@JvmOverloads
+constructor(
+    info: BitmapInfo?,
+    private val delegateFactory: DelegateFactory = SimpleDelegateFactory,
+) : Drawable(), Callback {
 
     @JvmOverloads constructor(b: Bitmap, iconColor: Int = 0) : this(BitmapInfo.of(b, iconColor))
 
@@ -48,6 +54,8 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
     var isAnimationEnabled: Boolean = true
 
     @JvmField protected val paint: Paint = Paint(FILTER_BITMAP_FLAG or ANTI_ALIAS_FLAG)
+
+    val delegate = delegateFactory.newDelegate(bitmapInfo, paint, this)
 
     @JvmField @VisibleForTesting var isPressed: Boolean = false
     @JvmField @VisibleForTesting var isHovered: Boolean = false
@@ -93,6 +101,7 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
     override fun onBoundsChange(bounds: Rect) {
         super.onBoundsChange(bounds)
         badge?.setBadgeBounds(bounds)
+        delegate.onBoundsChange(bounds)
     }
 
     override fun draw(canvas: Canvas) {
@@ -101,27 +110,27 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
             val bounds = bounds
             canvas.scale(scale, scale, bounds.exactCenterX(), bounds.exactCenterY())
             drawInternal(canvas, bounds)
-            badge?.draw(canvas)
             canvas.restoreToCount(count)
         } else {
             drawInternal(canvas, bounds)
-            badge?.draw(canvas)
         }
     }
 
-    protected open fun drawInternal(canvas: Canvas, bounds: Rect) {
-        canvas.drawBitmap(bitmapInfo.icon, null, bounds, paint)
+    private fun drawInternal(canvas: Canvas, bounds: Rect) {
+        delegate.drawContent(bitmapInfo, canvas, bounds, paint)
+        badge?.draw(canvas)
     }
 
     /** Returns the primary icon color, slightly tinted white */
-    open fun getIconColor(): Int =
-        ColorUtils.compositeColors(
-            GraphicsUtils.setColorAlphaBound(Color.WHITE, WHITE_SCRIM_ALPHA),
-            bitmapInfo.color,
-        )
+    fun getIconColor(): Int = delegate.getIconColor(bitmapInfo)
 
     /** Returns if this represents a themed icon */
-    open fun isThemed(): Boolean = false
+    fun isThemed(): Boolean = delegate.isThemed()
+
+    override fun setVisible(visible: Boolean, restart: Boolean): Boolean =
+        super.setVisible(visible, restart).also { delegate.onVisibilityChanged(visible) }
+
+    override fun onLevelChange(level: Int) = delegate.onLevelChange(level)
 
     /**
      * Returns true if the drawable was created with theme, even if it doesn't support theming
@@ -145,6 +154,7 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
             paint.alpha = alpha
             invalidateSelf()
             badge?.alpha = alpha
+            delegate.setAlpha(alpha)
         }
     }
 
@@ -227,23 +237,22 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
     }
 
     /** Updates the paint to reflect the current brightness and saturation. */
-    protected open fun updateFilter() {
+    private fun updateFilter() {
         paint.setColorFilter(if (isDisabled) getDisabledColorFilter(disabledAlpha) else paintFilter)
         badge?.colorFilter = colorFilter
+        delegate.updateFilter(isDisabled, disabledAlpha)
         invalidateSelf()
     }
 
-    protected open fun newConstantState(): FastBitmapConstantState {
-        return FastBitmapConstantState(bitmapInfo)
-    }
-
-    override fun getConstantState(): ConstantState {
-        val cs = newConstantState()
-        cs.mIsDisabled = isDisabled
-        cs.mBadgeConstantState = badge?.constantState
-        cs.mCreationFlags = creationFlags
-        return cs
-    }
+    override fun getConstantState() =
+        FastBitmapConstantState(
+            bitmapInfo,
+            isDisabled,
+            badge?.constantState,
+            creationFlags,
+            delegateFactory,
+            level,
+        )
 
     // Returns if the FastBitmapDrawable contains a badge.
     fun hasBadge(): Boolean = (creationFlags and BitmapInfo.FLAG_NO_BADGE) == 0
@@ -264,27 +273,23 @@ open class FastBitmapDrawable(info: BitmapInfo?) : Drawable(), Callback {
         unscheduleSelf(what)
     }
 
-    open class FastBitmapConstantState(val bitmapInfo: BitmapInfo) : ConstantState() {
-        // These are initialized later so that subclasses don't need to
-        // pass everything in constructor
-        var mIsDisabled: Boolean = false
-        var mBadgeConstantState: ConstantState? = null
-
-        @DrawableCreationFlags var mCreationFlags: Int = 0
-
-        constructor(bitmap: Bitmap, color: Int) : this(BitmapInfo.of(bitmap, color))
-
-        protected open fun createDrawable(): FastBitmapDrawable {
-            return FastBitmapDrawable(bitmapInfo)
-        }
+    data class FastBitmapConstantState(
+        val bitmapInfo: BitmapInfo,
+        val isDisabled: Boolean,
+        val badgeConstantState: ConstantState?,
+        val creationFlags: Int,
+        val delegateFactory: DelegateFactory,
+        val level: Int,
+    ) : ConstantState() {
 
         override fun newDrawable(): FastBitmapDrawable {
-            val drawable = createDrawable()
-            drawable.isDisabled = mIsDisabled
-            if (mBadgeConstantState != null) {
-                drawable.badge = mBadgeConstantState!!.newDrawable()
+            val drawable = FastBitmapDrawable(bitmapInfo, delegateFactory)
+            drawable.isDisabled = isDisabled
+            if (badgeConstantState != null) {
+                drawable.badge = badgeConstantState.newDrawable()
             }
-            drawable.creationFlags = mCreationFlags
+            drawable.creationFlags = creationFlags
+            drawable.level = level
             return drawable
         }
 
