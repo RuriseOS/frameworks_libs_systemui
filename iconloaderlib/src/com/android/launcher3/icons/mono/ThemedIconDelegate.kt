@@ -24,11 +24,15 @@ import android.graphics.Paint
 import android.graphics.Rect
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
+import com.android.launcher3.icons.FastBitmapDrawable.Companion.FULLY_OPAQUE
+import com.android.launcher3.icons.FastBitmapDrawable.Companion.getDisabledColor
+import com.android.launcher3.icons.FastBitmapDrawableDelegate
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.R
 
-/** Class to handle monochrome themed app icons */
-class ThemedIconDrawable(constantState: ThemedConstantState) :
-    FastBitmapDrawable(constantState.bitmapInfo) {
+/** Drawing delegate handle monochrome themed app icons */
+class ThemedIconDelegate(constantState: ThemedIconInfo) : FastBitmapDrawableDelegate {
+
     private val colorFg = constantState.colorFg
     private val colorBg = constantState.colorBg
 
@@ -43,13 +47,13 @@ class ThemedIconDrawable(constantState: ThemedConstantState) :
     private val mBgPaint =
         Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { colorFilter = bgFilter }
 
-    override fun drawInternal(canvas: Canvas, bounds: Rect) {
+    override fun drawContent(info: BitmapInfo, canvas: Canvas, bounds: Rect, paint: Paint) {
         canvas.drawBitmap(bgBitmap, null, bounds, mBgPaint)
         canvas.drawBitmap(monoIcon, null, bounds, monoPaint)
     }
 
-    override fun updateFilter() {
-        super.updateFilter()
+    override fun updateFilter(isDisabled: Boolean, disabledAlpha: Float) {
+        super.updateFilter(isDisabled, disabledAlpha)
         val alpha = if (isDisabled) (disabledAlpha * FULLY_OPAQUE).toInt() else FULLY_OPAQUE
         mBgPaint.alpha = alpha
         mBgPaint.setColorFilter(
@@ -64,21 +68,7 @@ class ThemedIconDrawable(constantState: ThemedConstantState) :
 
     override fun isThemed() = true
 
-    override fun newConstantState() =
-        ThemedConstantState(bitmapInfo, monoIcon, bgBitmap, colorBg, colorFg)
-
-    override fun getIconColor() = colorFg
-
-    class ThemedConstantState(
-        bitmapInfo: BitmapInfo,
-        val mono: Bitmap,
-        val whiteShadowLayer: Bitmap,
-        val colorBg: Int,
-        val colorFg: Int,
-    ) : FastBitmapConstantState(bitmapInfo) {
-
-        public override fun createDrawable() = ThemedIconDrawable(this)
-    }
+    override fun getIconColor(info: BitmapInfo) = colorFg
 
     companion object {
         const val TAG: String = "ThemedIconDrawable"
@@ -93,4 +83,15 @@ class ThemedIconDrawable(constantState: ThemedConstantState) :
             )
         }
     }
+}
+
+class ThemedIconInfo(
+    val mono: Bitmap,
+    val whiteShadowLayer: Bitmap,
+    val colorBg: Int,
+    val colorFg: Int,
+) : DelegateFactory {
+
+    override fun newDelegate(bitmapInfo: BitmapInfo, paint: Paint, host: FastBitmapDrawable) =
+        ThemedIconDelegate(this)
 }
