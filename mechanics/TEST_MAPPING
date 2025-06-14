@@ -30,7 +30,7 @@
       ]
     }
   ],
-  "wm-cf": [
+  "wm": [
     {
       "name": "WMShellUnitTests"
     }
