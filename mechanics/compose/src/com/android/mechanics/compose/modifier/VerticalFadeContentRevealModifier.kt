@@ -191,10 +191,17 @@ private class FadeContentRevealNode(
             when (transitionState) {
                 is TransitionState.Idle -> {
                     val containerMinHeight = 0
-                    val currentScene = transitionState.currentScene
+                    val overlays = transitionState.currentOverlays
+                    val scene = transitionState.currentScene
+                    // The content is revealed if its height exceeds the minimum container height.
                     val isRevealed =
                         with(contentScope) {
-                            val targetHeight = container.targetSize(currentScene)?.height ?: 0
+                            // Determine the target content's height, prioritizing overlays, then
+                            // the current scene.
+                            val targetSize =
+                                overlays.firstNotNullOfOrNull { container.targetSize(it) }
+                                    ?: container.targetSize(scene)
+                            val targetHeight = targetSize?.height ?: 0
                             targetHeight > containerMinHeight
                         }
                     MotionSpec(directionalMotionSpec(Mapping.Fixed(if (isRevealed) 1f else 0f)))
