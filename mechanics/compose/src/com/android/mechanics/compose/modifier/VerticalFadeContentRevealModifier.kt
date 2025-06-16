@@ -21,25 +21,30 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.layout.ApproachLayoutModifierNode
 import androidx.compose.ui.layout.ApproachMeasureScope
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
-import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.ObserverModifierNode
+import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.toIntRect
+import androidx.compose.ui.unit.toRect
 import androidx.compose.ui.util.fastCoerceAtLeast
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
+import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.mechanics.gestureContextOrDefault
 import com.android.mechanics.MotionValue
 import com.android.mechanics.debug.findMotionValueDebugger
 import com.android.mechanics.effects.FixedValue
 import com.android.mechanics.spec.Mapping
+import com.android.mechanics.spec.MotionSpec
 import com.android.mechanics.spec.builder.MotionBuilderContext
+import com.android.mechanics.spec.builder.directionalMotionSpec
 import com.android.mechanics.spec.builder.effectsMotionSpec
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -104,14 +109,14 @@ private data class FadeContentRevealElement(
     }
 }
 
-internal class FadeContentRevealNode(
+private class FadeContentRevealNode(
     private var contentScope: ContentScope,
     private var motionBuilderContext: MotionBuilderContext,
     private var container: ElementKey,
     private var deltaY: Float,
     label: String?,
     private val debug: Boolean,
-) : Modifier.Node(), ApproachLayoutModifierNode {
+) : Modifier.Node(), ApproachLayoutModifierNode, ObserverModifierNode {
 
     private val motionValue =
         MotionValue(
@@ -119,14 +124,10 @@ internal class FadeContentRevealNode(
                 with(contentScope) {
                     val containerHeight =
                         container.lastSize(contentKey)?.height ?: return@MotionValue 0f
-                    val containerCoordinates =
-                        container.targetCoordinates(contentKey) ?: return@MotionValue 0f
-                    val localCoordinates = lastCoordinates ?: return@MotionValue 0f
-
-                    val offsetY = containerCoordinates.localPositionOf(localCoordinates).y
-                    containerHeight - offsetY + deltaY
+                    containerHeight + deltaY
                 }
             },
+            initialSpec = MotionSpec(directionalMotionSpec(Mapping.Zero)),
             gestureContext = contentScope.gestureContextOrDefault(),
             label = "FadeContentReveal(${label.orEmpty()})",
         )
@@ -141,12 +142,14 @@ internal class FadeContentRevealNode(
         this.motionBuilderContext = motionBuilderContext
         this.container = container
         this.deltaY = deltaY
-        updateMotionSpec()
+        updateMotionSpec(contentScope.layoutState.transitionState)
     }
 
     private var motionValueJob: Job? = null
 
     override fun onAttach() {
+        onObservedReadsChanged()
+
         motionValueJob =
             coroutineScope.launch {
                 val disposableHandle =
@@ -167,21 +170,45 @@ internal class FadeContentRevealNode(
         motionValueJob?.cancel()
     }
 
-    private fun isAnimating(): Boolean {
-        return contentScope.layoutState.currentTransition != null || !motionValue.isStable
+    override fun onObservedReadsChanged() {
+        observeReads { updateMotionSpec(contentScope.layoutState.transitionState) }
     }
 
-    override fun isMeasurementApproachInProgress(lookaheadSize: IntSize) = isAnimating()
-
     private var targetBounds = Rect.Zero
+    private var isContentTransition = false
 
-    private var lastCoordinates: LayoutCoordinates? = null
+    private fun updateMotionSpec(transitionState: TransitionState) {
+        isContentTransition = transitionState is TransitionState.Transition
 
-    private fun updateMotionSpec() {
+        val height = targetBounds.height
+        if (height == 0f) {
+            // We cannot compute specs for height 0.
+            motionValue.spec = MotionSpec(directionalMotionSpec(Mapping.Fixed(0f)))
+            return
+        }
+
         motionValue.spec =
-            motionBuilderContext.effectsMotionSpec(Mapping.Zero) {
-                after(targetBounds.bottom, FixedValue.One)
+            when (transitionState) {
+                is TransitionState.Idle -> {
+                    val containerMinHeight = 0
+                    val currentScene = transitionState.currentScene
+                    val isRevealed =
+                        with(contentScope) {
+                            val targetHeight = container.targetSize(currentScene)?.height ?: 0
+                            targetHeight > containerMinHeight
+                        }
+                    MotionSpec(directionalMotionSpec(Mapping.Fixed(if (isRevealed) 1f else 0f)))
+                }
+                is TransitionState.Transition -> {
+                    motionBuilderContext.effectsMotionSpec(Mapping.Zero) {
+                        after(targetBounds.bottom, FixedValue.One)
+                    }
+                }
             }
+    }
+
+    override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean {
+        return isContentTransition || !motionValue.isStable
     }
 
     override fun MeasureScope.measure(
@@ -192,11 +219,13 @@ internal class FadeContentRevealNode(
         return layout(placeable.width, placeable.height) {
             val coordinates = coordinates
             if (isLookingAhead && coordinates != null) {
-                lastCoordinates = coordinates
-                val bounds = coordinates.boundsInParent()
+                val containerCoordinates =
+                    with(contentScope) { container.targetCoordinates(contentKey)!! }
+                val containerOffset = containerCoordinates.localPositionOf(coordinates)
+                val bounds = coordinates.size.toIntRect().toRect().translate(containerOffset)
                 if (targetBounds != bounds) {
                     targetBounds = bounds
-                    updateMotionSpec()
+                    updateMotionSpec(contentScope.layoutState.transitionState)
                 }
             }
             placeable.place(IntOffset.Zero)
