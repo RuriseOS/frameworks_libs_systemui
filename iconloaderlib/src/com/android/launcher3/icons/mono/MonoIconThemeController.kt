@@ -42,6 +42,7 @@ import com.android.launcher3.icons.IconThemeController
 import com.android.launcher3.icons.MonochromeIconFactory
 import com.android.launcher3.icons.SourceHint
 import com.android.launcher3.icons.ThemedBitmap
+import com.android.launcher3.icons.ThemedBitmap.Companion
 import java.nio.ByteBuffer
 
 @TargetApi(Build.VERSION_CODES.TIRAMISU)
@@ -57,7 +58,7 @@ class MonoIconThemeController(
         info: BitmapInfo,
         factory: BaseIconFactory,
         sourceHint: SourceHint?,
-    ): ThemedBitmap? {
+    ): ThemedBitmap {
         val mono =
             getMonochromeDrawable(
                 icon,
@@ -73,7 +74,7 @@ class MonoIconThemeController(
                 colorProvider,
             )
         }
-        return null
+        return ThemedBitmap.NOT_SUPPORTED
     }
 
     /**
