@@ -214,14 +214,14 @@ open class BitmapInfo(
     interface Extender {
         /** Called for creating a custom BitmapInfo */
         fun getExtendedInfo(
-            bitmap: Bitmap?,
+            bitmap: Bitmap,
             color: Int,
-            iconFactory: BaseIconFactory?,
+            iconFactory: BaseIconFactory,
             normalizationScale: Float,
-        ): BitmapInfo?
+        ): BitmapInfo
 
         /** Called to draw the UI independent of any runtime configurations like time or theme */
-        fun drawForPersistence(canvas: Canvas?)
+        fun drawForPersistence(canvas: Canvas)
     }
 
     /**
