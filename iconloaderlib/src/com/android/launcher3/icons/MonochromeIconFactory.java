@@ -32,11 +32,10 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
 
 import androidx.annotation.WorkerThread;
-
-import com.android.launcher3.icons.mono.MonoIconThemeController.ClippedMonoDrawable;
 
 import java.nio.ByteBuffer;
 
@@ -97,15 +96,24 @@ public class MonochromeIconFactory extends Drawable {
     }
 
     /**
+     *  Kept to layout lib compilation
+     * @deprecated use {@link #wrap(AdaptiveIconDrawable)} instead
+     */
+    @Deprecated
+    public Drawable wrap(AdaptiveIconDrawable icon, Path unused) {
+        return wrap(icon);
+    }
+
+    /**
      * Creates a monochrome version of the provided drawable
      */
     @WorkerThread
-    public Drawable wrap(AdaptiveIconDrawable icon, Path shapePath) {
+    public Drawable wrap(AdaptiveIconDrawable icon) {
         mFlatCanvas.drawColor(Color.BLACK);
         drawDrawable(icon.getBackground());
         drawDrawable(icon.getForeground());
         generateMono();
-        return new ClippedMonoDrawable(this, shapePath);
+        return new InsetDrawable(this, -AdaptiveIconDrawable.getExtraInsetFraction());
     }
 
     @WorkerThread

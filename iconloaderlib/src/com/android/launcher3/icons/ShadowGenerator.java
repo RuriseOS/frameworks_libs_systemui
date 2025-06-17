@@ -47,7 +47,7 @@ public class ShadowGenerator {
 
     // Amount by which an icon should be scaled down to make room for shadows.
     // We are ignoring KEY_SHADOW_DISTANCE because regular icons also ignore this: b/298203449
-    public static final float ICON_SCALE_FOR_SHADOWS =
+    static final float ICON_SCALE_FOR_SHADOWS =
             (HALF_DISTANCE - BLUR_FACTOR) / HALF_DISTANCE;
 
     private final int mIconSize;

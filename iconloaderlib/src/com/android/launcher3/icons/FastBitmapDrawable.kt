@@ -18,7 +18,6 @@ package com.android.launcher3.icons
 import android.R
 import android.animation.ObjectAnimator
 import android.graphics.Bitmap
-import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -29,7 +28,7 @@ import android.graphics.Paint.ANTI_ALIAS_FLAG
 import android.graphics.Paint.FILTER_BITMAP_FLAG
 import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.graphics.Shader.TileMode.CLAMP
+import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Drawable.Callback
 import android.util.FloatProperty
@@ -38,12 +37,11 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.Interpolator
 import android.view.animation.PathInterpolator
 import androidx.annotation.VisibleForTesting
-import com.android.launcher3.icons.BitmapInfo.Companion.FLAG_FULL_BLEED
 import com.android.launcher3.icons.BitmapInfo.Companion.LOW_RES_INFO
 import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.SimpleDelegateFactory
-import com.android.launcher3.icons.ShadowGenerator.ICON_SCALE_FOR_SHADOWS
+import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
 import kotlin.math.min
 
 class FastBitmapDrawable
@@ -61,9 +59,9 @@ constructor(
     var isAnimationEnabled: Boolean = true
 
     @JvmField protected val paint: Paint = Paint(FILTER_BITMAP_FLAG or ANTI_ALIAS_FLAG)
-    private val shader: BitmapShader = BitmapShader(bitmapInfo.icon, CLAMP, CLAMP)
 
     val delegate = delegateFactory.newDelegate(bitmapInfo, iconShape, paint, this)
+    private val shader: Shader? = delegate.createPaintShader(bitmapInfo, iconShape)
 
     @JvmField @VisibleForTesting var isPressed: Boolean = false
     @JvmField @VisibleForTesting var isHovered: Boolean = false
@@ -129,33 +127,18 @@ constructor(
         badge?.draw(canvas)
     }
 
-    fun drawContent(canvas: Canvas, bounds: Rect) {
-        if ((bitmapInfo.flags and FLAG_FULL_BLEED) != 0) {
-            drawShapedInternal(canvas, bounds)
-        } else {
-            canvas.drawBitmap(bitmapInfo.icon, null, bounds, paint)
-        }
-    }
-
-    private fun drawShapedInternal(canvas: Canvas, bounds: Rect) {
-        canvas.save()
+    /**
+     * Draws the shader created using [FastBitmapDrawableDelegate.createPaintShader] in the provided
+     * bounds
+     */
+    fun drawShaderInBounds(canvas: Canvas, bounds: Rect) {
         canvas.drawBitmap(iconShape.shadowLayer, null, bounds, paint)
 
-        canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
-        val iconWidth: Int = bitmapInfo.icon.width
-        val iconHeight: Int = bitmapInfo.icon.height
-
-        canvas.scale(bounds.width().toFloat() / iconWidth, bounds.height().toFloat() / iconHeight)
-        canvas.scale(
-            ICON_SCALE_FOR_SHADOWS,
-            ICON_SCALE_FOR_SHADOWS,
-            (iconWidth / 2).toFloat(),
-            (iconHeight / 2).toFloat(),
-        )
-        paint.shader = shader
-        canvas.drawPath(iconShape.path, paint)
-        paint.shader = null
-        canvas.restore()
+        canvas.resizeToContentSize(bounds, iconShape.pathSize.toFloat()) {
+            paint.shader = shader
+            drawPath(iconShape.path, paint)
+            paint.shader = null
+        }
     }
 
     /** Returns the primary icon color, slightly tinted white */
@@ -275,9 +258,10 @@ constructor(
 
     /** Updates the paint to reflect the current brightness and saturation. */
     private fun updateFilter() {
-        paint.setColorFilter(if (isDisabled) getDisabledColorFilter(disabledAlpha) else paintFilter)
-        badge?.colorFilter = colorFilter
-        delegate.updateFilter(isDisabled, disabledAlpha)
+        val filter = if (isDisabled) getDisabledColorFilter(disabledAlpha) else paintFilter
+        paint.colorFilter = filter
+        badge?.colorFilter = filter
+        delegate.updateFilter(filter)
         invalidateSelf()
     }
 

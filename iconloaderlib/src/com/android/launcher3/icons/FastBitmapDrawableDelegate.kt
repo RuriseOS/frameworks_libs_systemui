@@ -16,11 +16,16 @@
 
 package com.android.launcher3.icons
 
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.Shader
+import android.graphics.Shader.TileMode.CLAMP
 import androidx.core.graphics.ColorUtils
+import com.android.launcher3.icons.BitmapInfo.Companion.FLAG_FULL_BLEED
 
 /** A delegate for changing the rendering of [FastBitmapDrawable], to support multi-inheritance */
 interface FastBitmapDrawableDelegate {
@@ -36,7 +41,11 @@ interface FastBitmapDrawableDelegate {
         bounds: Rect,
         paint: Paint,
     ) {
-        host.drawContent(canvas, bounds)
+        if ((info.flags and FLAG_FULL_BLEED) != 0) {
+            host.drawShaderInBounds(canvas, bounds)
+        } else {
+            canvas.drawBitmap(info.icon, null, bounds, paint)
+        }
     }
 
     /** [FastBitmapDrawable.getIconColor] */
@@ -53,13 +62,22 @@ interface FastBitmapDrawableDelegate {
     fun setAlpha(alpha: Int) {}
 
     /** [android.graphics.drawable.Drawable.setColorFilter] */
-    fun updateFilter(isDisabled: Boolean, disabledAlpha: Float) {}
+    fun updateFilter(filter: ColorFilter?) {}
 
     /** [android.graphics.drawable.Drawable.setVisible] */
     fun onVisibilityChanged(isVisible: Boolean) {}
 
     /** [android.graphics.drawable.Drawable.onLevelChange] */
     fun onLevelChange(level: Int): Boolean = false
+
+    /** Creates a default shader to be used for drawing the drawable */
+    fun createPaintShader(bitmapInfo: BitmapInfo, shape: IconShape): Shader? {
+        return if ((bitmapInfo.flags and FLAG_FULL_BLEED) != 0) {
+            BitmapShader(bitmapInfo.icon, CLAMP, CLAMP)
+        } else {
+            null
+        }
+    }
 
     /**
      * Interface for creating new delegates. This should not store any state information and can

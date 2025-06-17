@@ -17,36 +17,43 @@ package com.android.launcher3.icons.mono
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BlendMode.SRC_IN
-import android.graphics.BlendModeColorFilter
 import android.graphics.Canvas
+import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.Shader
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
-import com.android.launcher3.icons.FastBitmapDrawable.Companion.FULLY_OPAQUE
-import com.android.launcher3.icons.FastBitmapDrawable.Companion.getDisabledColor
 import com.android.launcher3.icons.FastBitmapDrawableDelegate
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
+import com.android.launcher3.icons.GraphicsUtils.getColorMultipliedFilter
+import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
 import com.android.launcher3.icons.IconShape
 import com.android.launcher3.icons.R
 
 /** Drawing delegate handle monochrome themed app icons */
-class ThemedIconDelegate(constantState: ThemedIconInfo) : FastBitmapDrawableDelegate {
+class ThemedIconDelegate(
+    constantState: ThemedIconInfo,
+    val iconShape: IconShape,
+    val paint: Paint,
+) : FastBitmapDrawableDelegate {
 
     private val colorFg = constantState.colorFg
-    private val colorBg = constantState.colorBg
 
     // The foreground/monochrome icon for the app
     private val monoIcon = constantState.mono
-    private val monoFilter = BlendModeColorFilter(colorFg, SRC_IN)
     private val monoPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { colorFilter = monoFilter }
+        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            colorFilter = getColorMultipliedFilter(colorFg, paint.colorFilter)
+        }
 
-    private val bgBitmap = constantState.whiteShadowLayer
-    private val bgFilter = BlendModeColorFilter(colorBg, SRC_IN)
-    private val mBgPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { colorFilter = bgFilter }
+    private val shapeBounds = Rect(0, 0, iconShape.pathSize, iconShape.pathSize)
+
+    init {
+        paint.color = constantState.colorBg
+    }
+
+    override fun createPaintShader(bitmapInfo: BitmapInfo, shape: IconShape): Shader? = null
 
     override fun drawContent(
         info: BitmapInfo,
@@ -55,22 +62,21 @@ class ThemedIconDelegate(constantState: ThemedIconInfo) : FastBitmapDrawableDele
         bounds: Rect,
         paint: Paint,
     ) {
-        canvas.drawBitmap(bgBitmap, null, bounds, mBgPaint)
-        canvas.drawBitmap(monoIcon, null, bounds, monoPaint)
+        canvas.drawBitmap(iconShape.shadowLayer, null, bounds, paint)
+
+        canvas.resizeToContentSize(bounds, iconShape.pathSize.toFloat()) {
+            clipPath(iconShape.path)
+            drawPaint(paint)
+            drawBitmap(monoIcon, null, shapeBounds, monoPaint)
+        }
     }
 
-    override fun updateFilter(isDisabled: Boolean, disabledAlpha: Float) {
-        super.updateFilter(isDisabled, disabledAlpha)
-        val alpha = if (isDisabled) (disabledAlpha * FULLY_OPAQUE).toInt() else FULLY_OPAQUE
-        mBgPaint.alpha = alpha
-        mBgPaint.setColorFilter(
-            if (isDisabled) BlendModeColorFilter(getDisabledColor(colorBg), SRC_IN) else bgFilter
-        )
-
+    override fun setAlpha(alpha: Int) {
         monoPaint.alpha = alpha
-        monoPaint.setColorFilter(
-            if (isDisabled) BlendModeColorFilter(getDisabledColor(colorFg), SRC_IN) else monoFilter
-        )
+    }
+
+    override fun updateFilter(filter: ColorFilter?) {
+        monoPaint.colorFilter = getColorMultipliedFilter(colorFg, filter)
     }
 
     override fun isThemed() = true
@@ -92,17 +98,12 @@ class ThemedIconDelegate(constantState: ThemedIconInfo) : FastBitmapDrawableDele
     }
 }
 
-class ThemedIconInfo(
-    val mono: Bitmap,
-    val whiteShadowLayer: Bitmap,
-    val colorBg: Int,
-    val colorFg: Int,
-) : DelegateFactory {
+class ThemedIconInfo(val mono: Bitmap, val colorBg: Int, val colorFg: Int) : DelegateFactory {
 
     override fun newDelegate(
         bitmapInfo: BitmapInfo,
         iconShape: IconShape,
         paint: Paint,
         host: FastBitmapDrawable,
-    ) = ThemedIconDelegate(this)
+    ) = ThemedIconDelegate(this, iconShape, paint)
 }

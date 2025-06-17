@@ -18,8 +18,15 @@ package com.android.launcher3.icons
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat.PNG
+import android.graphics.BlendMode
+import android.graphics.BlendModeColorFilter
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
@@ -27,8 +34,14 @@ import android.graphics.Region
 import android.graphics.RegionIterator
 import android.util.Log
 import androidx.annotation.ColorInt
+import androidx.core.graphics.ColorUtils.compositeColors
+import com.android.launcher3.icons.GraphicsUtils.resize
+import com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
+import com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import kotlin.math.ceil
+import kotlin.math.max
 
 object GraphicsUtils {
     private const val TAG = "GraphicsUtils"
@@ -100,26 +113,103 @@ object GraphicsUtils {
         restoreToCount(saveCount)
     }
 
-    /** Resizes given IconShape to [newSize] as a new instance of IconShape. */
+    /** Resizes this path from [oldSize] to [newSize] as a new instance of Path. */
     @JvmStatic
-    fun IconShape.resize(newSize: Float): IconShape {
-        val transformedPath = resizePath(path, pathSize, newSize)
-        return IconShape(newSize, transformedPath, shadowLayer)
-    }
-
-    /** Resizes given [basePath] from [oldSize] to [newSize] as a new instance of Path. */
-    @JvmStatic
-    fun resizePath(basePath: Path, oldSize: Float, newSize: Float): Path {
-        return Path(basePath).apply {
+    fun Path.resize(oldSize: Int, newSize: Int): Path =
+        Path(this).apply {
             transform(
                 Matrix().apply {
                     setRectToRect(
-                        RectF(0f, 0f, oldSize, oldSize),
-                        RectF(0f, 0f, newSize, newSize),
+                        RectF(0f, 0f, oldSize.toFloat(), oldSize.toFloat()),
+                        RectF(0f, 0f, newSize.toFloat(), newSize.toFloat()),
                         Matrix.ScaleToFit.CENTER,
                     )
                 }
             )
+        }
+
+    /**
+     * Resizes the canvas to that [bounds] align with [0, 0, [sizeX], [sizeY]] space and executes
+     * the [block]. It also scales down the drawing by [ICON_VISIBLE_AREA_FACTOR] to account for
+     * icon normalization.
+     */
+    inline fun Canvas.resizeToContentSize(
+        bounds: Rect,
+        sizeX: Float,
+        sizeY: Float = sizeX,
+        block: Canvas.() -> Unit,
+    ) = transformed {
+        translate(bounds.left.toFloat(), bounds.top.toFloat())
+        scale(bounds.width() / sizeX, bounds.height() / sizeY)
+        scale(ICON_VISIBLE_AREA_FACTOR, ICON_VISIBLE_AREA_FACTOR, sizeX / 2, sizeY / 2)
+        block.invoke(this)
+    }
+
+    /**
+     * Generates a new [IconShape] for the [size] and the [shapePath] (in bounds [0, 0, [size],
+     * [size]]
+     */
+    @JvmStatic
+    fun generateIconShape(size: Int, shapePath: Path): IconShape {
+        // Generate shadow layer:
+        // Based on adaptive icon drawing in BaseIconFactory
+        val offset =
+            max(
+                ceil((BLUR_FACTOR * size)).toInt(),
+                Math.round(size * (1 - ICON_VISIBLE_AREA_FACTOR) / 2),
+            )
+        val shadowLayer =
+            BitmapRenderer.createHardwareBitmap(size, size) { canvas: Canvas ->
+                canvas.transformed {
+                    canvas.translate(offset.toFloat(), offset.toFloat())
+                    val drawnPathSize = size - offset * 2
+                    val drawnPath = shapePath.resize(size, drawnPathSize)
+                    ShadowGenerator(size).addPathShadow(drawnPath, canvas)
+                }
+            }
+        return IconShape(pathSize = size, path = shapePath, shadowLayer = shadowLayer)
+    }
+
+    /** Returns a color filter which is equivalent to [filter] x BlendModeFilter with [color] */
+    fun getColorMultipliedFilter(color: Int, filter: ColorFilter?): ColorFilter? {
+        if (Color.alpha(color) == 0) return filter
+        if (filter == null) return BlendModeColorFilter(color, BlendMode.SRC_IN)
+
+        return when {
+            filter is BlendModeColorFilter && filter.mode == BlendMode.SRC_IN ->
+                BlendModeColorFilter(compositeColors(filter.color, color), BlendMode.SRC_IN)
+            filter is ColorMatrixColorFilter -> {
+                val matrix = ColorMatrix().apply { filter.getColorMatrix(this) }.array
+                val components = IntArray(4)
+                for (i in 0..3) {
+                    val s = 5 * i
+                    components[i] =
+                        (Color.red(color) * matrix[s] +
+                                Color.green(color) * matrix[s + 1] +
+                                Color.blue(color) * matrix[s + 2] +
+                                Color.alpha(color) * matrix[s + 3] +
+                                matrix[s + 4])
+                            .toInt()
+                            .coerceIn(0, 255)
+                }
+                BlendModeColorFilter(
+                    Color.argb(components[3], components[0], components[1], components[2]),
+                    BlendMode.SRC_IN,
+                )
+            }
+            // Don't know what this is, draw and find out
+            else -> {
+                val bitmap =
+                    BitmapRenderer.createSoftwareBitmap(1, 1) { c ->
+                        c.drawPaint(
+                            Paint().also {
+                                it.color = color
+                                it.colorFilter = filter
+                            }
+                        )
+                    }
+                BlendModeColorFilter(bitmap.getPixel(0, 0), BlendMode.SRC_IN)
+            }
         }
     }
 }
