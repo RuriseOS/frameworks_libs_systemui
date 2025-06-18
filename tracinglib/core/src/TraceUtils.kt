@@ -65,14 +65,14 @@ import kotlin.contracts.contract
  * would cause malformed traces because the [beginSlice] wasn't closed before the thread became idle
  * and started running unrelated work.
  *
- * @param sliceName The name of the code section to appear in the trace
+ * @param name The name of the code section to appear in the trace
  * @see endSlice
  * @see traceCoroutine
  */
 @SuppressLint("UnclosedTrace")
 @PublishedApi
-internal fun beginSlice(sliceName: String) {
-    Trace.traceBegin(Trace.TRACE_TAG_APP, sliceName)
+internal fun beginSlice(traceTag: Long = Trace.TRACE_TAG_APP, name: String) {
+    Trace.traceBegin(traceTag, name)
 }
 
 /**
@@ -84,8 +84,8 @@ internal fun beginSlice(sliceName: String) {
  * @see traceCoroutine
  */
 @PublishedApi
-internal fun endSlice() {
-    Trace.traceEnd(Trace.TRACE_TAG_APP)
+internal fun endSlice(traceTag: Long = Trace.TRACE_TAG_APP) {
+    Trace.traceEnd(traceTag)
 }
 
 /**
@@ -93,36 +93,60 @@ internal fun endSlice() {
  * after the passed block.
  */
 @OptIn(ExperimentalContracts::class)
-public inline fun <T> traceSection(tag: String, block: () -> T): T {
+public inline fun <T> traceSection(name: String, block: () -> T): T =
+    traceSection(Trace.TRACE_TAG_APP, name, block)
+
+/**
+ * Run a block within a [Trace] section. Calls [Trace.beginSection] before and [Trace.endSection]
+ * after the passed block.
+ */
+@OptIn(ExperimentalContracts::class)
+public inline fun <T> traceSection(
+    traceTag: Long = Trace.TRACE_TAG_APP,
+    name: String,
+    block: () -> T,
+): T {
     contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-    val tracingEnabled = Trace.isEnabled()
-    if (tracingEnabled) beginSlice(tag)
+    val tracingEnabled = Trace.isTagEnabled(traceTag)
+    if (tracingEnabled) beginSlice(traceTag, name)
     return try {
         // Note that as this is inline, the block section would be duplicated if it is called
         // several times. For this reason, we're using the try/finally even if tracing is disabled.
         block()
     } finally {
-        if (tracingEnabled) endSlice()
+        if (tracingEnabled) endSlice(traceTag)
     }
 }
 
 /**
- * Same as [traceSection], but the tag is provided as a lambda to help avoiding creating expensive
- * strings when not needed.
+ * Same as [traceSection], but the section name is provided as a lambda to help avoiding creating
+ * expensive strings when not needed.
  */
 @OptIn(ExperimentalContracts::class)
-public inline fun <T> traceSection(tag: () -> String?, block: () -> T): T {
+public inline fun <T> traceSection(name: () -> String?, block: () -> T): T =
+    traceSection(Trace.TRACE_TAG_APP, name, block)
+
+/**
+ * Same as [traceSection], but the section name is provided as a lambda to help avoiding creating
+ * expensive strings when not needed.
+ */
+@OptIn(ExperimentalContracts::class)
+public inline fun <T> traceSection(
+    traceTag: Long = Trace.TRACE_TAG_APP,
+    name: () -> String?,
+    block: () -> T,
+ ): T {
     contract {
-        callsInPlace(tag, InvocationKind.AT_MOST_ONCE)
+        callsInPlace(name, InvocationKind.AT_MOST_ONCE)
         callsInPlace(block, InvocationKind.EXACTLY_ONCE)
     }
-    val sliceName = if (Trace.isEnabled()) tag() else null
+    val sliceName = if (Trace.isTagEnabled(traceTag)) name() else null
     val tracingEnabled = sliceName != null
-    if (tracingEnabled) beginSlice(sliceName!!)
+    if (tracingEnabled) beginSlice(traceTag, sliceName!!)
     return try {
         block()
     } finally {
-        if (tracingEnabled) endSlice()
+        if (tracingEnabled) endSlice(traceTag)
     }
 }
 
@@ -148,26 +172,26 @@ public object TraceUtils {
     public const val DEFAULT_TRACK_NAME: String = "AsyncTraces"
 
     @JvmStatic
-    public inline fun <T> trace(tag: () -> String, block: () -> T): T {
-        return traceSection(tag) { block() }
+    public inline fun <T> trace(name: () -> String, block: () -> T): T {
+        return traceSection(name) { block() }
     }
 
     @JvmStatic
-    public inline fun <T> trace(tag: String, crossinline block: () -> T): T {
-        return traceSection(tag) { block() }
+    public inline fun <T> trace(name: String, crossinline block: () -> T): T {
+        return traceSection(name) { block() }
     }
 
     @JvmStatic
-    public inline fun traceRunnable(tag: String, crossinline block: () -> Unit): Runnable {
-        return Runnable { traceSection(tag) { block() } }
+    public inline fun traceRunnable(name: String, crossinline block: () -> Unit): Runnable {
+        return Runnable { traceSection(name) { block() } }
     }
 
     @JvmStatic
     public inline fun traceRunnable(
-        crossinline tag: () -> String,
+        crossinline name: () -> String,
         crossinline block: () -> Unit,
     ): Runnable {
-        return Runnable { traceSection(tag) { block() } }
+        return Runnable { traceSection(name) { block() } }
     }
 
     /**
@@ -182,10 +206,10 @@ public object TraceUtils {
 
     /** Creates an async slice in the default track. */
     @JvmStatic
-    public inline fun <T> traceAsync(tag: () -> String, block: () -> T): T {
+    public inline fun <T> traceAsync(name: () -> String, block: () -> T): T {
         val tracingEnabled = Trace.isEnabled()
         return if (tracingEnabled) {
-            traceAsync(DEFAULT_TRACK_NAME, tag(), block)
+            traceAsync(DEFAULT_TRACK_NAME, name(), block)
         } else {
             block()
         }
@@ -194,13 +218,13 @@ public object TraceUtils {
     /**
      * Creates an async slice in the default track.
      *
-     * The [tag] is computed only if tracing is enabled. See [traceAsync].
+     * The [name] is computed only if tracing is enabled. See [traceAsync].
      */
     @JvmStatic
-    public inline fun <T> traceAsync(trackName: String, tag: () -> String, block: () -> T): T {
+    public inline fun <T> traceAsync(trackName: String, name: () -> String, block: () -> T): T {
         val tracingEnabled = Trace.isEnabled()
         return if (tracingEnabled) {
-            traceAsync(trackName, tag(), block)
+            traceAsync(trackName, name(), block)
         } else {
             block()
         }

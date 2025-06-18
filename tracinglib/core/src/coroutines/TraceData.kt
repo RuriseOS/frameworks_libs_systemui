@@ -184,7 +184,7 @@ internal class TraceData(internal val currentId: Int, private val strictMode: Bo
             if (::slices.isInitialized) {
                 var count: Byte = 0
                 slices.descendingIterator().forEach { sectionName ->
-                    beginSlice(sectionName)
+                    beginSlice(name = sectionName)
                     count++
                 }
                 return count
@@ -205,7 +205,7 @@ internal class TraceData(internal val currentId: Int, private val strictMode: Bo
             slices = ArrayDeque<TraceSection>(4)
         }
         slices.push(name)
-        beginSlice(name)
+        beginSlice(name = name)
     }
 
     /**
