@@ -25,7 +25,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.ColorDrawable
@@ -170,7 +169,7 @@ class ClockDrawableWrapper private constructor(base: AdaptiveIconDrawable) :
         val mFlattenedBackground: Bitmap,
         val themeData: AnimationInfo?,
         val themeBackground: Bitmap?,
-    ) : BitmapInfo(icon, color, /* flags */ 0, /* themedBitmap */ null) {
+    ) : BitmapInfo(icon, color, flags = 0, themedBitmap = null) {
         val boundsOffset: Float =
             max(ShadowGenerator.BLUR_FACTOR.toDouble(), ((1 - scale) / 2).toDouble()).toFloat()
 
@@ -178,7 +177,7 @@ class ClockDrawableWrapper private constructor(base: AdaptiveIconDrawable) :
         override fun newIcon(
             context: Context,
             @DrawableCreationFlags creationFlags: Int,
-            badgeShape: Path?,
+            iconShape: IconShape?,
         ): FastBitmapDrawable {
             val bg: Bitmap
             val themedFgColor: Int
@@ -197,11 +196,10 @@ class ClockDrawableWrapper private constructor(base: AdaptiveIconDrawable) :
                 bg = mFlattenedBackground
                 bgFilter = null
             }
-
             val delegateInfo =
                 ClockDelegateInfo(themedFgColor, boundsOffset, animInfo, bg, bgFilter)
-            val d = FastBitmapDrawable(this, delegateInfo)
-            applyFlags(context, d, creationFlags, null)
+            val d = FastBitmapDrawable(this, iconShape ?: defaultIconShape, delegateInfo)
+            applyFlags(context, d, creationFlags)
             return d
         }
 
@@ -235,6 +233,7 @@ class ClockDrawableWrapper private constructor(base: AdaptiveIconDrawable) :
     ) : DelegateFactory {
         override fun newDelegate(
             bitmapInfo: BitmapInfo,
+            iconShape: IconShape,
             paint: Paint,
             host: FastBitmapDrawable,
         ): FastBitmapDrawableDelegate {
@@ -289,9 +288,15 @@ class ClockDrawableWrapper private constructor(base: AdaptiveIconDrawable) :
             mFullDrawable.setBounds(0, 0, bounds.width(), bounds.height())
         }
 
-        override fun drawContent(info: BitmapInfo, canvas: Canvas, bounds: Rect, paint: Paint) {
+        override fun drawContent(
+            info: BitmapInfo,
+            host: FastBitmapDrawable,
+            canvas: Canvas,
+            bounds: Rect,
+            paint: Paint,
+        ) {
             if (mAnimInfo == null) {
-                super.drawContent(info, canvas, bounds, paint)
+                super.drawContent(info, mHost, canvas, bounds, paint)
                 return
             }
             canvas.drawBitmap(mBG, null, bounds, mBgPaint)

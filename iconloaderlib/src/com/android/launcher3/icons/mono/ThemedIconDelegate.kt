@@ -28,6 +28,7 @@ import com.android.launcher3.icons.FastBitmapDrawable.Companion.FULLY_OPAQUE
 import com.android.launcher3.icons.FastBitmapDrawable.Companion.getDisabledColor
 import com.android.launcher3.icons.FastBitmapDrawableDelegate
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
+import com.android.launcher3.icons.IconShape
 import com.android.launcher3.icons.R
 
 /** Drawing delegate handle monochrome themed app icons */
@@ -47,7 +48,13 @@ class ThemedIconDelegate(constantState: ThemedIconInfo) : FastBitmapDrawableDele
     private val mBgPaint =
         Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { colorFilter = bgFilter }
 
-    override fun drawContent(info: BitmapInfo, canvas: Canvas, bounds: Rect, paint: Paint) {
+    override fun drawContent(
+        info: BitmapInfo,
+        host: FastBitmapDrawable,
+        canvas: Canvas,
+        bounds: Rect,
+        paint: Paint,
+    ) {
         canvas.drawBitmap(bgBitmap, null, bounds, mBgPaint)
         canvas.drawBitmap(monoIcon, null, bounds, monoPaint)
     }
@@ -92,6 +99,10 @@ class ThemedIconInfo(
     val colorFg: Int,
 ) : DelegateFactory {
 
-    override fun newDelegate(bitmapInfo: BitmapInfo, paint: Paint, host: FastBitmapDrawable) =
-        ThemedIconDelegate(this)
+    override fun newDelegate(
+        bitmapInfo: BitmapInfo,
+        iconShape: IconShape,
+        paint: Paint,
+        host: FastBitmapDrawable,
+    ) = ThemedIconDelegate(this)
 }

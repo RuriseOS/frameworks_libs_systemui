@@ -29,8 +29,14 @@ interface FastBitmapDrawableDelegate {
     fun onBoundsChange(bounds: Rect) {}
 
     /** [android.graphics.drawable.Drawable.draw] */
-    fun drawContent(info: BitmapInfo, canvas: Canvas, bounds: Rect, paint: Paint) {
-        canvas.drawBitmap(info.icon, null, bounds, paint)
+    fun drawContent(
+        info: BitmapInfo,
+        host: FastBitmapDrawable,
+        canvas: Canvas,
+        bounds: Rect,
+        paint: Paint,
+    ) {
+        host.drawContent(canvas, bounds)
     }
 
     /** [FastBitmapDrawable.getIconColor] */
@@ -63,13 +69,18 @@ interface FastBitmapDrawableDelegate {
 
         fun newDelegate(
             bitmapInfo: BitmapInfo,
+            iconShape: IconShape,
             paint: Paint,
             host: FastBitmapDrawable,
         ): FastBitmapDrawableDelegate
     }
 
     object SimpleDelegateFactory : DelegateFactory {
-        override fun newDelegate(bitmapInfo: BitmapInfo, paint: Paint, host: FastBitmapDrawable) =
-            object : FastBitmapDrawableDelegate {}
+        override fun newDelegate(
+            bitmapInfo: BitmapInfo,
+            iconShape: IconShape,
+            paint: Paint,
+            host: FastBitmapDrawable,
+        ) = object : FastBitmapDrawableDelegate {}
     }
 }
