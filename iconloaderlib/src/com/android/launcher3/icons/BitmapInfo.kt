@@ -18,7 +18,6 @@ package com.android.launcher3.icons
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Path
 import android.graphics.drawable.Drawable
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
@@ -30,12 +29,21 @@ import com.android.launcher3.util.FlagOp
 open class BitmapInfo(
     @JvmField val icon: Bitmap,
     @JvmField val color: Int,
+    @JvmField val defaultIconShape: IconShape = IconShape.EMPTY,
     @BitmapInfoFlags @JvmField var flags: Int = 0,
     var themedBitmap: ThemedBitmap? = null,
 ) {
     @IntDef(
         flag = true,
-        value = [FLAG_WORK, FLAG_INSTANT, FLAG_CLONE, FLAG_PRIVATE, FLAG_WRAPPED_NON_ADAPTIVE],
+        value =
+            [
+                FLAG_WORK,
+                FLAG_INSTANT,
+                FLAG_CLONE,
+                FLAG_PRIVATE,
+                FLAG_WRAPPED_NON_ADAPTIVE,
+                FLAG_FULL_BLEED,
+            ],
     )
     internal annotation class BitmapInfoFlags
 
@@ -59,7 +67,7 @@ open class BitmapInfo(
 
     @Override
     open fun clone(): BitmapInfo {
-        return copyInternalsTo(BitmapInfo(icon, color))
+        return copyInternalsTo(BitmapInfo(icon, color, defaultIconShape))
     }
 
     protected fun copyInternalsTo(target: BitmapInfo): BitmapInfo {
@@ -101,17 +109,21 @@ open class BitmapInfo(
      *
      * @param context Context
      * @param creationFlags Flags for creating the FastBitmapDrawable
-     * @param badgeShape Optional Path for masking icon badges to a shape. Should be 100x100.
+     * @param iconShape information for custom Icon Shapes, to use with Full-bleed icons.
      * @return FastBitmapDrawable
      */
     open fun newIcon(
         context: Context,
         @DrawableCreationFlags creationFlags: Int,
-        badgeShape: Path?,
+        iconShape: IconShape?,
     ): FastBitmapDrawable {
         val drawable: FastBitmapDrawable =
             if (isLowRes) {
-                FastBitmapDrawable(this, PlaceHolderDelegateFactory(context))
+                FastBitmapDrawable(
+                    this,
+                    iconShape ?: defaultIconShape,
+                    PlaceHolderDelegateFactory(context),
+                )
             } else if (
                 (creationFlags and FLAG_THEMED) != 0 &&
                     themedBitmap != null &&
@@ -119,9 +131,9 @@ open class BitmapInfo(
             ) {
                 themedBitmap!!.newDrawable(this, context)
             } else {
-                FastBitmapDrawable(this)
+                FastBitmapDrawable(this, iconShape ?: defaultIconShape)
             }
-        applyFlags(context, drawable, creationFlags, badgeShape)
+        applyFlags(context, drawable, creationFlags)
         return drawable
     }
 
@@ -129,7 +141,6 @@ open class BitmapInfo(
         context: Context,
         drawable: FastBitmapDrawable,
         @DrawableCreationFlags creationFlags: Int,
-        badgeShape: Path?,
     ) {
         this.creationFlags = creationFlags
         drawable.disabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f)
@@ -140,7 +151,6 @@ open class BitmapInfo(
                     context,
                     (creationFlags and FLAG_THEMED) != 0,
                     (creationFlags and FLAG_SKIP_USER_BADGE) != 0,
-                    badgeShape,
                 )
             if (badge != null) {
                 drawable.badge = badge
@@ -156,8 +166,8 @@ open class BitmapInfo(
      * @param badgeShape Optional Path to mask badges to a shape. Should be 100x100.
      * @return Drawable for the badge.
      */
-    fun getBadgeDrawable(context: Context, isThemed: Boolean, badgeShape: Path?): Drawable? {
-        return getBadgeDrawable(context, isThemed, false, badgeShape)
+    fun getBadgeDrawable(context: Context, isThemed: Boolean): Drawable? {
+        return getBadgeDrawable(context, isThemed, false)
     }
 
     /**
@@ -173,20 +183,19 @@ open class BitmapInfo(
         context: Context,
         isThemed: Boolean,
         skipUserBadge: Boolean,
-        badgeShape: Path?,
     ): Drawable? {
         if (badgeInfo != null) {
             var creationFlag = if (isThemed) FLAG_THEMED else 0
             if (skipUserBadge) {
                 creationFlag = creationFlag or FLAG_SKIP_USER_BADGE
             }
-            return badgeInfo!!.newIcon(context, creationFlag, badgeShape)
+            return badgeInfo!!.newIcon(context, creationFlag, null)
         }
         if (skipUserBadge) {
             return null
         } else {
             getBadgeDrawableInfo()?.let {
-                return UserBadgeDrawable(context, it.drawableRes, it.colorRes, isThemed, badgeShape)
+                return UserBadgeDrawable(context, it.drawableRes, it.colorRes, isThemed)
             }
         }
         return null
@@ -245,6 +254,7 @@ open class BitmapInfo(
         const val FLAG_CLONE: Int = 1 shl 2
         const val FLAG_PRIVATE: Int = 1 shl 3
         const val FLAG_WRAPPED_NON_ADAPTIVE: Int = 1 shl 4
+        const val FLAG_FULL_BLEED: Int = 1 shl 5
 
         // Drawable creation flags
         const val FLAG_THEMED: Int = 1 shl 0
@@ -256,12 +266,18 @@ open class BitmapInfo(
 
         @JvmStatic
         fun fromBitmap(bitmap: Bitmap): BitmapInfo {
-            return of(bitmap, 0)
+            return of(bitmap, 0, IconShape.EMPTY)
         }
 
         @JvmStatic
-        fun of(bitmap: Bitmap, color: Int): BitmapInfo {
-            return BitmapInfo(bitmap, color)
+        fun of(bitmap: Bitmap, color: Int, defaultShape: IconShape = IconShape.EMPTY): BitmapInfo {
+            val flags = if (defaultShape == IconShape.EMPTY) 0 else FLAG_FULL_BLEED
+            return BitmapInfo(
+                icon = bitmap,
+                color = color,
+                defaultIconShape = defaultShape,
+                flags = flags,
+            )
         }
     }
 }

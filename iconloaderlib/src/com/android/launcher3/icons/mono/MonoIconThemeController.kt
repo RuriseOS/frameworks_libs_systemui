@@ -69,7 +69,12 @@ class MonoIconThemeController(
             )
         if (mono != null) {
             return MonoThemedBitmap(
-                factory.createIconBitmap(mono, ICON_VISIBLE_AREA_FACTOR, MODE_ALPHA),
+                factory.createIconBitmap(
+                    mono,
+                    ICON_VISIBLE_AREA_FACTOR,
+                    MODE_ALPHA,
+                    factory.mDrawFullBleedIcons,
+                ),
                 factory.whiteShadowLayer,
                 colorProvider,
             )

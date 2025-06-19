@@ -38,12 +38,12 @@ import androidx.core.graphics.ColorUtils;
  */
 public class PlaceHolderDrawableDelegate implements FastBitmapDrawableDelegate {
 
-    // Path in [0, 100] bounds.
     private final Path mProgressPath;
     private final Paint mPaint;
 
-    public PlaceHolderDrawableDelegate(BitmapInfo info, Paint paint, int loadingColor) {
-        mProgressPath = getDefaultPath();
+    public PlaceHolderDrawableDelegate(BitmapInfo info, IconShape iconShape, Paint paint,
+            int loadingColor) {
+        mProgressPath = iconShape.path;
         mPaint = paint;
         paint.setColor(ColorUtils.compositeColors(loadingColor, info.color));
     }
@@ -60,8 +60,8 @@ public class PlaceHolderDrawableDelegate implements FastBitmapDrawableDelegate {
     }
 
     @Override
-    public void drawContent(@NonNull BitmapInfo info, @NonNull Canvas canvas, @NonNull Rect bounds,
-            @NonNull Paint paint) {
+    public void drawContent(@NonNull BitmapInfo info, @NonNull FastBitmapDrawable host,
+            @NonNull Canvas canvas, @NonNull Rect bounds, @NonNull Paint paint) {
         int saveCount = canvas.save();
         canvas.translate(bounds.left, bounds.top);
         canvas.scale(bounds.width() / 100f, bounds.height() / 100f);
@@ -103,8 +103,9 @@ public class PlaceHolderDrawableDelegate implements FastBitmapDrawableDelegate {
         @NonNull
         @Override
         public FastBitmapDrawableDelegate newDelegate(@NonNull BitmapInfo bitmapInfo,
-                @NonNull Paint paint, @NonNull FastBitmapDrawable host) {
-            return new PlaceHolderDrawableDelegate(bitmapInfo, paint, mLoadingColor);
+                @NonNull IconShape iconShape, @NonNull Paint paint,
+                    @NonNull FastBitmapDrawable host) {
+            return new PlaceHolderDrawableDelegate(bitmapInfo, iconShape, paint, mLoadingColor);
         }
     }
 }

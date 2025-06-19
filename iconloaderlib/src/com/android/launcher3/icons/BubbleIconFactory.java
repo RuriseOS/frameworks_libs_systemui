@@ -78,7 +78,7 @@ public class BubbleIconFactory extends BaseIconFactory {
             outScale = new float[1];
         }
         icon = normalizeAndWrapToAdaptiveIcon(icon, outScale);
-        return createIconBitmap(icon, outScale[0], MODE_WITH_SHADOW);
+        return createIconBitmap(icon, outScale[0], MODE_WITH_SHADOW, mDrawFullBleedIcons);
     }
 
     /**
@@ -95,7 +95,7 @@ public class BubbleIconFactory extends BaseIconFactory {
             userBadgedAppIcon = new CircularRingDrawable(userBadgedAppIcon);
         }
         Bitmap userBadgedBitmap = mBadgeFactory.createIconBitmap(
-                userBadgedAppIcon, 1, MODE_WITH_SHADOW);
+                userBadgedAppIcon, 1, MODE_WITH_SHADOW, mDrawFullBleedIcons);
         return mBadgeFactory.createIconBitmap(userBadgedBitmap);
     }
 
