@@ -98,6 +98,9 @@ public class BaseIconFactory implements AutoCloseable {
 
     /** Shadow bitmap used as background for theme icons */
     private Bitmap mWhiteShadowLayer;
+    /** Default IconShape for when custom shape is not needed */
+    private IconShape mDefaultIconShape;
+
     /** Bitmap used for {@link BitmapShader} to mask Adaptive Icons when drawing */
     private Bitmap mShaderBitmap;
 
@@ -259,11 +262,13 @@ public class BaseIconFactory implements AutoCloseable {
      */
     public IconShape getDefaultIconShape() {
         if (!mDrawFullBleedIcons) return IconShape.EMPTY;
+        if (mDefaultIconShape != null) return mDefaultIconShape;
         AdaptiveIconDrawable tempAdaptiveIcon =
                 new AdaptiveIconDrawable(new ColorDrawable(BLACK), null);
         tempAdaptiveIcon.setBounds(0, 0, mIconBitmapSize, mIconBitmapSize);
-        return new IconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask(),
+        mDefaultIconShape = new IconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask(),
                 getWhiteShadowLayer());
+        return mDefaultIconShape;
     }
 
     @NonNull
