@@ -16,6 +16,8 @@
 
 package com.android.launcher3.icons;
 
+import static com.android.launcher3.icons.ShadowGenerator.ICON_SCALE_FOR_SHADOWS;
+
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -43,7 +45,7 @@ public class IconNormalizer {
     private static final int MIN_VISIBLE_ALPHA = 40;
 
     // Ratio of the diameter of an normalized circular icon to the actual icon size.
-    public static final float ICON_VISIBLE_AREA_FACTOR = 0.92f;
+    public static final float ICON_VISIBLE_AREA_FACTOR = Math.min(0.92f, ICON_SCALE_FOR_SHADOWS);
 
     private final int mMaxSize;
     private final Bitmap mBitmap;

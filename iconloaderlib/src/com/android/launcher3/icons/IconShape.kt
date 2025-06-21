@@ -25,7 +25,7 @@ import android.graphics.drawable.ColorDrawable
 
 data class IconShape(
     /** Size that [path] should be scaled to. */
-    @JvmField val pathSize: Float,
+    @JvmField val pathSize: Int,
     /** Path for icon shape to be used as mask. Ensure this is scaled to [pathSize] */
     @JvmField val path: Path,
     /** Shadow layer to draw behind icon. Should use the same shape and scale as [path] */
@@ -33,7 +33,7 @@ data class IconShape(
 ) {
 
     companion object {
-        const val DEFAULT_PATH_SIZE = 100f
+        private const val DEFAULT_PATH_SIZE = 100
 
         // Placeholder that can be used if icon shape is not needed.
         @JvmField
@@ -41,7 +41,7 @@ data class IconShape(
             IconShape(
                 DEFAULT_PATH_SIZE,
                 AdaptiveIconDrawable(ColorDrawable(Color.WHITE), null)
-                    .apply { setBounds(0, 0, DEFAULT_PATH_SIZE.toInt(), DEFAULT_PATH_SIZE.toInt()) }
+                    .apply { setBounds(0, 0, DEFAULT_PATH_SIZE, DEFAULT_PATH_SIZE) }
                     .iconMask,
                 createBitmap(1, 1, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) },
             )

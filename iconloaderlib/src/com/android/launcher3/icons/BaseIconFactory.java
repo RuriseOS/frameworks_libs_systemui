@@ -8,9 +8,9 @@ import static android.graphics.drawable.AdaptiveIconDrawable.getExtraInsetFracti
 
 import static com.android.launcher3.icons.BitmapInfo.FLAG_FULL_BLEED;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_INSTANT;
+import static com.android.launcher3.icons.GraphicsUtils.generateIconShape;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR;
-import static com.android.launcher3.icons.ShadowGenerator.ICON_SCALE_FOR_SHADOWS;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
@@ -96,11 +96,8 @@ public class BaseIconFactory implements AutoCloseable {
     @Nullable
     private ShadowGenerator mShadowGenerator;
 
-    /** Shadow bitmap used as background for theme icons */
-    private Bitmap mWhiteShadowLayer;
     /** Default IconShape for when custom shape is not needed */
     private IconShape mDefaultIconShape;
-
     /** Bitmap used for {@link BitmapShader} to mask Adaptive Icons when drawing */
     private Bitmap mShaderBitmap;
 
@@ -235,11 +232,19 @@ public class BaseIconFactory implements AutoCloseable {
                 ? options.mExtractedColor : ColorExtractor.findDominantColorByHue(bitmap);
 
         BitmapInfo info = BitmapInfo.of(bitmap, color, getDefaultIconShape());
-        if (mDrawFullBleedIcons) info.flags |= FLAG_FULL_BLEED;
+
+        FlagOp flagOp = getBitmapFlagOp(options);
+        if (adaptiveIcon instanceof WrappedAdaptiveIcon) {
+            flagOp = flagOp.addFlag(BitmapInfo.FLAG_WRAPPED_NON_ADAPTIVE);
+        }
+        if (mDrawFullBleedIcons) flagOp = flagOp.addFlag(FLAG_FULL_BLEED);
+        info = info.withFlags(flagOp);
 
         if (adaptiveIcon instanceof Extender extender) {
-            info = extender.getExtendedInfo(bitmap, color, this, scale[0]);
-        } else if (IconProvider.ATLEAST_T && mThemeController != null && adaptiveIcon != null) {
+            info = extender.getUpdatedBitmapInfo(info, this);
+        }
+
+        if (IconProvider.ATLEAST_T && mThemeController != null && adaptiveIcon != null) {
             info.setThemedBitmap(
                     mThemeController.createThemedBitmap(
                         adaptiveIcon,
@@ -249,11 +254,7 @@ public class BaseIconFactory implements AutoCloseable {
                     )
             );
         }
-        FlagOp flagOp = getBitmapFlagOp(options);
-        if (adaptiveIcon instanceof WrappedAdaptiveIcon) {
-            flagOp = flagOp.addFlag(BitmapInfo.FLAG_WRAPPED_NON_ADAPTIVE);
-        }
-        info = info.withFlags(flagOp);
+
         return info;
     }
 
@@ -266,8 +267,7 @@ public class BaseIconFactory implements AutoCloseable {
         AdaptiveIconDrawable tempAdaptiveIcon =
                 new AdaptiveIconDrawable(new ColorDrawable(BLACK), null);
         tempAdaptiveIcon.setBounds(0, 0, mIconBitmapSize, mIconBitmapSize);
-        mDefaultIconShape = new IconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask(),
-                getWhiteShadowLayer());
+        mDefaultIconShape = generateIconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask());
         return mDefaultIconShape;
     }
 
@@ -313,19 +313,9 @@ public class BaseIconFactory implements AutoCloseable {
         return drawable.getIconMask();
     }
 
-    @NonNull
-    public Bitmap getWhiteShadowLayer() {
-        if (mWhiteShadowLayer == null) {
-            mWhiteShadowLayer = createScaledBitmap(
-                    new AdaptiveIconDrawable(new ColorDrawable(Color.WHITE), null),
-                    MODE_HARDWARE_WITH_SHADOW);
-        }
-        return mWhiteShadowLayer;
-    }
-
     /**
      * Takes an {@link AdaptiveIconDrawable} and uses it to create a new Shader Bitmap.
-     * {@link mShaderBitmap} will be used to create a {@link BitmapShader} for masking,
+     * {@link #mShaderBitmap} will be used to create a {@link BitmapShader} for masking,
      * such as for icon shapes. Will reuse underlying Bitmap where possible.
      *
      * @param adaptiveIcon AdaptiveIconDrawable to draw with shader
@@ -361,9 +351,8 @@ public class BaseIconFactory implements AutoCloseable {
 
     @NonNull
     public Bitmap createScaledBitmap(@NonNull Drawable icon, @BitmapGenerationMode int mode) {
-        float[] scale = new float[1];
-        icon = normalizeAndWrapToAdaptiveIcon(icon, scale);
-        return createIconBitmap(icon, Math.min(scale[0], ICON_SCALE_FOR_SHADOWS), mode, false);
+        icon = normalizeAndWrapToAdaptiveIcon(icon, new float[1]);
+        return createIconBitmap(icon, ICON_VISIBLE_AREA_FACTOR, mode, false);
     }
 
     /**
@@ -477,14 +466,11 @@ public class BaseIconFactory implements AutoCloseable {
                     && !isFullBleedEnabled) {
                 getShadowGenerator().addPathShadow(aid.getIconMask(), canvas);
             }
-
-            if (icon instanceof Extender) {
-                ((Extender) icon).drawForPersistence(canvas);
-            } else {
-                drawAdaptiveIcon(canvas, aid, isFullBleedEnabled,
-                        getShapePath(aid, icon.getBounds()));
+            if (icon instanceof Extender extender) {
+                extender.drawForPersistence();
             }
 
+            drawAdaptiveIcon(canvas, aid, isFullBleedEnabled, getShapePath(aid, icon.getBounds()));
             canvas.restoreToCount(count);
         } else {
             if (icon instanceof BitmapDrawable) {
@@ -533,7 +519,7 @@ public class BaseIconFactory implements AutoCloseable {
 
     /**
      * Draws AdaptiveIconDrawable onto canvas using provided Path
-     * and {@link mShaderBitmap} as a shader.
+     * and {@link #mShaderBitmap} as a shader.
      *
      * @param canvas    canvas to draw on
      * @param drawable  AdaptiveIconDrawable to draw

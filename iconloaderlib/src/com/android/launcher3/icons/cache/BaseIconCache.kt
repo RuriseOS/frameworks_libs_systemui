@@ -656,7 +656,7 @@ constructor(
             ComponentKey(ComponentName(packageName, packageName + EMPTY_CLASS_NAME), user)
 
         // Ensures themed bitmaps in the icon cache are invalidated
-        @JvmField val RELEASE_VERSION = if (Flags.enableLauncherIconShapes()) 11 else 10
+        @JvmField val RELEASE_VERSION = if (Flags.enableLauncherIconShapes()) 13 else 12
 
         @JvmField val TABLE_NAME = "icons"
         @JvmField val COLUMN_ROWID = "rowid"

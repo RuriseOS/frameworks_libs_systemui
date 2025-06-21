@@ -17,21 +17,23 @@ package com.android.launcher3.icons
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.IntDef
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.SimpleDelegateFactory
 import com.android.launcher3.icons.PlaceHolderDrawableDelegate.PlaceHolderDelegateFactory
 import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.util.FlagOp
 
-open class BitmapInfo(
+class BitmapInfo(
     @JvmField val icon: Bitmap,
     @JvmField val color: Int,
     @JvmField val defaultIconShape: IconShape = IconShape.EMPTY,
     @BitmapInfoFlags @JvmField var flags: Int = 0,
     var themedBitmap: ThemedBitmap? = null,
+    var delegateFactory: DelegateFactory = SimpleDelegateFactory,
 ) {
     @IntDef(
         flag = true,
@@ -66,14 +68,15 @@ open class BitmapInfo(
     }
 
     @Override
-    open fun clone(): BitmapInfo {
+    fun clone(): BitmapInfo {
         return copyInternalsTo(BitmapInfo(icon, color, defaultIconShape))
     }
 
-    protected fun copyInternalsTo(target: BitmapInfo): BitmapInfo {
+    private fun copyInternalsTo(target: BitmapInfo): BitmapInfo {
         target.themedBitmap = themedBitmap
         target.flags = flags
         target.badgeInfo = badgeInfo
+        target.delegateFactory = delegateFactory
         return target
     }
 
@@ -84,24 +87,15 @@ open class BitmapInfo(
     val isLowRes: Boolean
         get() = matchingLookupFlag.useLowRes()
 
-    open val matchingLookupFlag: CacheLookupFlag
+    val matchingLookupFlag: CacheLookupFlag
         /** Returns the lookup flag to match this current state of this info */
         get() =
             CacheLookupFlag.DEFAULT_LOOKUP_FLAG.withUseLowRes(LOW_RES_ICON == icon)
                 .withThemeIcon(themedBitmap != null)
 
     /** BitmapInfo can be stored on disk or other persistent storage */
-    open fun canPersist(): Boolean {
-        return !isNullOrLowRes
-    }
-
-    /** Creates a drawable for the provided BitmapInfo */
-    @JvmOverloads
-    fun newIcon(
-        context: Context,
-        @DrawableCreationFlags creationFlags: Int = 0,
-    ): FastBitmapDrawable {
-        return newIcon(context, creationFlags, null)
+    fun canPersist(): Boolean {
+        return !isNullOrLowRes && delegateFactory == SimpleDelegateFactory
     }
 
     /**
@@ -112,10 +106,11 @@ open class BitmapInfo(
      * @param iconShape information for custom Icon Shapes, to use with Full-bleed icons.
      * @return FastBitmapDrawable
      */
-    open fun newIcon(
+    @JvmOverloads
+    fun newIcon(
         context: Context,
-        @DrawableCreationFlags creationFlags: Int,
-        iconShape: IconShape?,
+        @DrawableCreationFlags creationFlags: Int = 0,
+        iconShape: IconShape? = null,
     ): FastBitmapDrawable {
         val drawable: FastBitmapDrawable =
             if (isLowRes) {
@@ -129,15 +124,15 @@ open class BitmapInfo(
                     themedBitmap != null &&
                     themedBitmap !== ThemedBitmap.NOT_SUPPORTED
             ) {
-                themedBitmap!!.newDrawable(this, context)
+                themedBitmap!!.newDrawable(this, context, iconShape ?: defaultIconShape)
             } else {
-                FastBitmapDrawable(this, iconShape ?: defaultIconShape)
+                FastBitmapDrawable(this, iconShape ?: defaultIconShape, delegateFactory)
             }
         applyFlags(context, drawable, creationFlags)
         return drawable
     }
 
-    protected fun applyFlags(
+    private fun applyFlags(
         context: Context,
         drawable: FastBitmapDrawable,
         @DrawableCreationFlags creationFlags: Int,
@@ -219,18 +214,14 @@ open class BitmapInfo(
         }
     }
 
-    /** Interface to be implemented by drawables to provide a custom BitmapInfo */
+    /** Interface to be implemented by drawables to customize a BitmapInfo */
     interface Extender {
-        /** Called for creating a custom BitmapInfo */
-        fun getExtendedInfo(
-            bitmap: Bitmap,
-            color: Int,
-            iconFactory: BaseIconFactory,
-            normalizationScale: Float,
-        ): BitmapInfo
+
+        /** Returns an update [BitmapInfo] replacing the existing [info] */
+        fun getUpdatedBitmapInfo(info: BitmapInfo, factory: BaseIconFactory): BitmapInfo
 
         /** Called to draw the UI independent of any runtime configurations like time or theme */
-        fun drawForPersistence(canvas: Canvas)
+        fun drawForPersistence()
     }
 
     /**

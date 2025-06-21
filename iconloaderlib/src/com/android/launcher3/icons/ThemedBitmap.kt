@@ -25,7 +25,7 @@ import com.android.launcher3.util.ComponentKey
 interface ThemedBitmap {
 
     /** Creates a new Drawable */
-    fun newDrawable(info: BitmapInfo, context: Context): FastBitmapDrawable
+    fun newDrawable(info: BitmapInfo, context: Context, shape: IconShape): FastBitmapDrawable
 
     fun serialize(): ByteArray
 
@@ -35,7 +35,8 @@ interface ThemedBitmap {
         /** ThemedBitmap to be used when theming is not supported for a particular bitmap */
         val NOT_SUPPORTED =
             object : ThemedBitmap {
-                override fun newDrawable(info: BitmapInfo, context: Context) = info.newIcon(context)
+                override fun newDrawable(info: BitmapInfo, context: Context, shape: IconShape) =
+                    info.newIcon(context = context, iconShape = shape)
 
                 override fun serialize() = ByteArray(0)
             }
