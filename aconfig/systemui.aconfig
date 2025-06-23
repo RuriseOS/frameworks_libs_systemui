@@ -9,13 +9,6 @@ flag {
 }
 
 flag {
-    name: "return_animation_framework_library"
-    namespace: "systemui"
-    description: "Turn on Return functionality in the Animation library"
-    bug: "273205603"
-}
-
-flag {
     name: "return_animation_framework_long_lived"
     namespace: "systemui"
     description: "Turn on long-lived Return registrations in the Animation library"
