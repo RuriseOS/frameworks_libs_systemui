@@ -35,13 +35,10 @@ import android.graphics.RegionIterator
 import android.util.Log
 import androidx.annotation.ColorInt
 import androidx.core.graphics.ColorUtils.compositeColors
-import com.android.launcher3.icons.GraphicsUtils.resize
+import com.android.launcher3.icons.BitmapRenderer.createHardwareBitmap
 import com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
-import com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import kotlin.math.ceil
-import kotlin.math.max
 
 object GraphicsUtils {
     private const val TAG = "GraphicsUtils"
@@ -133,6 +130,7 @@ object GraphicsUtils {
      * the [block]. It also scales down the drawing by [ICON_VISIBLE_AREA_FACTOR] to account for
      * icon normalization.
      */
+    @JvmStatic
     inline fun Canvas.resizeToContentSize(
         bounds: Rect,
         sizeX: Float,
@@ -150,25 +148,17 @@ object GraphicsUtils {
      * [size]]
      */
     @JvmStatic
-    fun generateIconShape(size: Int, shapePath: Path): IconShape {
-        // Generate shadow layer:
-        // Based on adaptive icon drawing in BaseIconFactory
-        val offset =
-            max(
-                ceil((BLUR_FACTOR * size)).toInt(),
-                Math.round(size * (1 - ICON_VISIBLE_AREA_FACTOR) / 2),
-            )
-        val shadowLayer =
-            BitmapRenderer.createHardwareBitmap(size, size) { canvas: Canvas ->
-                canvas.transformed {
-                    canvas.translate(offset.toFloat(), offset.toFloat())
-                    val drawnPathSize = size - offset * 2
-                    val drawnPath = shapePath.resize(size, drawnPathSize)
-                    ShadowGenerator(size).addPathShadow(drawnPath, canvas)
-                }
-            }
-        return IconShape(pathSize = size, path = shapePath, shadowLayer = shadowLayer)
-    }
+    fun generateIconShape(size: Int, shapePath: Path): IconShape =
+        IconShape(
+            pathSize = size,
+            path = shapePath,
+            shadowLayer =
+                createHardwareBitmap(size, size) {
+                    it.resizeToContentSize(Rect(0, 0, size, size), size.toFloat()) {
+                        ShadowGenerator(size).addPathShadow(shapePath, this)
+                    }
+                },
+        )
 
     /** Returns a color filter which is equivalent to [filter] x BlendModeFilter with [color] */
     fun getColorMultipliedFilter(color: Int, filter: ColorFilter?): ColorFilter? {
