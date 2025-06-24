@@ -62,13 +62,13 @@ private constructor(base: AdaptiveIconDrawable, private val animationInfo: Clock
                 it.drawColor(Color.BLACK)
                 drawable.background?.draw(it)
             }
-        val result = info.clone()
-        result.delegateFactory =
-            animationInfo.copy(
-                themeFgColor = NO_COLOR,
-                shaderProvider = { BitmapShader(flattenBG, CLAMP, CLAMP) },
-            )
-        return result
+        return info.copy(
+            delegateFactory =
+                animationInfo.copy(
+                    themeFgColor = NO_COLOR,
+                    shaderProvider = { BitmapShader(flattenBG, CLAMP, CLAMP) },
+                )
+        )
     }
 
     override fun drawForPersistence() {

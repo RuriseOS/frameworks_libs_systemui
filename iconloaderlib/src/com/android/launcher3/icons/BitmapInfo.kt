@@ -27,13 +27,25 @@ import com.android.launcher3.icons.PlaceHolderDrawableDelegate.PlaceHolderDelega
 import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.util.FlagOp
 
-class BitmapInfo(
+/**
+ * Data class that holds all the information needed to create an icon drawable.
+ *
+ * @property icon the bitmap of the icon.
+ * @property color the color of the icon.
+ * @property flags extra source information associated with this icon
+ * @property defaultIconShape the fallback shape when no shape is provided during icon creation
+ * @property themedBitmap theming information if the icon is created using [FLAG_THEMED]
+ * @property delegateFactory factory used for icon creation
+ * @property badgeInfo optional badge drawn on the icon
+ */
+data class BitmapInfo(
     @JvmField val icon: Bitmap,
     @JvmField val color: Int,
-    @JvmField val defaultIconShape: IconShape = IconShape.EMPTY,
-    @BitmapInfoFlags @JvmField var flags: Int = 0,
-    var themedBitmap: ThemedBitmap? = null,
-    var delegateFactory: DelegateFactory = SimpleDelegateFactory,
+    @BitmapInfoFlags val flags: Int = 0,
+    val defaultIconShape: IconShape = IconShape.EMPTY,
+    val themedBitmap: ThemedBitmap? = null,
+    val badgeInfo: BitmapInfo? = null,
+    val delegateFactory: DelegateFactory = SimpleDelegateFactory,
 ) {
     @IntDef(
         flag = true,
@@ -52,37 +64,14 @@ class BitmapInfo(
     @IntDef(flag = true, value = [FLAG_THEMED, FLAG_NO_BADGE, FLAG_SKIP_USER_BADGE])
     annotation class DrawableCreationFlags
 
-    // b/377618519: These are saved to debug why work badges sometimes don't show up on work apps
-    @DrawableCreationFlags @JvmField var creationFlags: Int = 0
-
-    private var badgeInfo: BitmapInfo? = null
-
-    fun withBadgeInfo(badgeInfo: BitmapInfo?) = clone().also { it.badgeInfo = badgeInfo }
+    fun withBadgeInfo(badgeInfo: BitmapInfo?) = copy(badgeInfo = badgeInfo)
 
     /** Returns a bitmapInfo with the flagOP applied */
-    fun withFlags(op: FlagOp): BitmapInfo {
-        if (op === FlagOp.NO_OP) {
-            return this
-        }
-        return clone().also { it.flags = op.apply(it.flags) }
-    }
+    fun withFlags(op: FlagOp): BitmapInfo =
+        if (op === FlagOp.NO_OP) this else copy(flags = op.apply(this.flags))
 
-    @Override
-    fun clone(): BitmapInfo {
-        return copyInternalsTo(BitmapInfo(icon, color, defaultIconShape))
-    }
-
-    private fun copyInternalsTo(target: BitmapInfo): BitmapInfo {
-        target.themedBitmap = themedBitmap
-        target.flags = flags
-        target.badgeInfo = badgeInfo
-        target.delegateFactory = delegateFactory
-        return target
-    }
-
-    // TODO: rename or remove because icon can no longer be null?
-    val isNullOrLowRes: Boolean
-        get() = icon == LOW_RES_ICON
+    /** Helper class to allow copy from java code */
+    fun withThemedBitmap(themedBitmap: ThemedBitmap?) = copy(themedBitmap = themedBitmap)
 
     val isLowRes: Boolean
         get() = matchingLookupFlag.useLowRes()
@@ -95,7 +84,7 @@ class BitmapInfo(
 
     /** BitmapInfo can be stored on disk or other persistent storage */
     fun canPersist(): Boolean {
-        return !isNullOrLowRes && delegateFactory == SimpleDelegateFactory
+        return !isLowRes && delegateFactory == SimpleDelegateFactory
     }
 
     /**
@@ -124,7 +113,7 @@ class BitmapInfo(
                     themedBitmap != null &&
                     themedBitmap !== ThemedBitmap.NOT_SUPPORTED
             ) {
-                themedBitmap!!.newDrawable(this, context, iconShape ?: defaultIconShape)
+                themedBitmap.newDrawable(this, context, iconShape ?: defaultIconShape)
             } else {
                 FastBitmapDrawable(this, iconShape ?: defaultIconShape, delegateFactory)
             }
@@ -137,7 +126,6 @@ class BitmapInfo(
         drawable: FastBitmapDrawable,
         @DrawableCreationFlags creationFlags: Int,
     ) {
-        this.creationFlags = creationFlags
         drawable.disabledAlpha = GraphicsUtils.getFloat(context, R.attr.disabledIconAlpha, 1f)
         drawable.creationFlags = creationFlags
         if ((creationFlags and FLAG_NO_BADGE) == 0) {
@@ -158,8 +146,6 @@ class BitmapInfo(
      *
      * @param context Context
      * @param isThemed If Drawable is themed.
-     * @param badgeShape Optional Path to mask badges to a shape. Should be 100x100.
-     * @return Drawable for the badge.
      */
     fun getBadgeDrawable(context: Context, isThemed: Boolean): Drawable? {
         return getBadgeDrawable(context, isThemed, false)
@@ -171,8 +157,6 @@ class BitmapInfo(
      * @param context Context
      * @param isThemed If the drawable is themed.
      * @param skipUserBadge If should skip User Profile badging.
-     * @param badgeShape Optional Path to mask badge Drawable to a shape. Should be 100x100.
-     * @return Drawable for an icon Badge.
      */
     private fun getBadgeDrawable(
         context: Context,
@@ -184,7 +168,7 @@ class BitmapInfo(
             if (skipUserBadge) {
                 creationFlag = creationFlag or FLAG_SKIP_USER_BADGE
             }
-            return badgeInfo!!.newIcon(context, creationFlag, null)
+            return badgeInfo.newIcon(context, creationFlag, null)
         }
         if (skipUserBadge) {
             return null
