@@ -262,7 +262,6 @@ public class BaseIconFactory implements AutoCloseable {
      * Generates an IconShape based on the current bitmap size and default icon mask.
      */
     public IconShape getDefaultIconShape() {
-        if (!mDrawFullBleedIcons) return IconShape.EMPTY;
         if (mDefaultIconShape != null) return mDefaultIconShape;
         AdaptiveIconDrawable tempAdaptiveIcon =
                 new AdaptiveIconDrawable(new ColorDrawable(BLACK), null);
