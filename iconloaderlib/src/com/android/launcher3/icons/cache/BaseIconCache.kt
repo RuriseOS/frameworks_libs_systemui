@@ -24,8 +24,6 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.NameNotFoundException
 import android.database.Cursor
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteReadOnlyDatabaseException
 import android.graphics.Bitmap
 import android.graphics.Bitmap.Config.HARDWARE
@@ -93,7 +91,7 @@ constructor(
 
     @JvmField val workerHandler = Handler(bgLooper)
 
-    @JvmField protected var iconDb = IconDB(context, dbFileName, iconPixelSize)
+    @JvmField protected var iconDb = createIconDb(iconPixelSize)
 
     private var defaultIcon: BitmapInfo? = null
     private val userFlagOpMap = SparseArray<FlagOp>()
@@ -133,7 +131,7 @@ constructor(
             userFlagOpMap.clear()
             iconDb.clear()
             iconDb.close()
-            iconDb = IconDB(context, dbFileName, iconPixelSize)
+            iconDb = createIconDb(iconPixelSize)
             cache.clear()
         } catch (e: SQLiteReadOnlyDatabaseException) {
             // This is known to happen during repeated backup and restores, if the Launcher is in
@@ -486,28 +484,22 @@ constructor(
         lookupFlags: CacheLookupFlag,
         cachingLogic: CachingLogic<*>,
     ): Boolean {
-        var c: Cursor? = null
         Trace.beginSection("loadIconIndividually")
         try {
-            c =
-                iconDb.query(
-                    lookupFlags.toLookupColumns(),
-                    "$COLUMN_COMPONENT = ? AND $COLUMN_USER = ?",
-                    arrayOf(
-                        cacheKey.componentName.flattenToString(),
-                        getSerialNumberForUser(cacheKey.user).toString(),
-                    ),
-                )
-            if (c.moveToNext()) {
-                return updateTitleAndIconLocked(cacheKey, entry, c, lookupFlags, cachingLogic)
+            return iconDb.querySingleEntry(
+                lookupFlags.toLookupColumns(),
+                "$COLUMN_COMPONENT = ? AND $COLUMN_USER = ?",
+                arrayOf(
+                    cacheKey.componentName.flattenToString(),
+                    getSerialNumberForUser(cacheKey.user).toString(),
+                ),
+                false,
+            ) {
+                updateTitleAndIconLocked(cacheKey, entry, it, lookupFlags, cachingLogic)
             }
-        } catch (e: SQLiteException) {
-            Log.d(TAG, "Error reading icon cache", e)
         } finally {
-            c?.close()
             Trace.endSection()
         }
-        return false
     }
 
     private fun updateTitleAndIconLocked(
@@ -561,7 +553,7 @@ constructor(
                     if (themeController != null && monoIconData != null) {
                         entry.bitmap.themedBitmap =
                             themeController.decode(
-                                data = monoIconData,
+                                bytes = monoIconData,
                                 info = entry.bitmap,
                                 factory = factory,
                                 sourceHint =
@@ -614,31 +606,26 @@ constructor(
         Log.d(TAG, message, e)
     }
 
-    /** Cache class to store the actual entries on disk */
-    class IconDB(context: Context, dbFileName: String?, iconPixelSize: Int) :
+    /** Creates a cache class to store the actual entries on disk */
+    private fun createIconDb(iconPixelSize: Int) =
         SQLiteCacheHelper(
             context,
             dbFileName,
             (RELEASE_VERSION shl 16) + iconPixelSize,
             TABLE_NAME,
         ) {
-
-        override fun onCreateTable(db: SQLiteDatabase) {
-            db.execSQL(
-                ("CREATE TABLE IF NOT EXISTS $TABLE_NAME (" +
-                    "$COLUMN_COMPONENT TEXT NOT NULL, " +
-                    "$COLUMN_USER INTEGER NOT NULL, " +
-                    "$COLUMN_FRESHNESS_ID TEXT, " +
-                    "$COLUMN_ICON BLOB, " +
-                    "$COLUMN_MONO_ICON BLOB, " +
-                    "$COLUMN_ICON_COLOR INTEGER NOT NULL DEFAULT 0, " +
-                    "$COLUMN_FLAGS INTEGER NOT NULL DEFAULT 0, " +
-                    "$COLUMN_LABEL TEXT, " +
-                    "PRIMARY KEY ($COLUMN_COMPONENT, $COLUMN_USER) " +
-                    ");")
-            )
+            "CREATE TABLE IF NOT EXISTS $TABLE_NAME (" +
+                "$COLUMN_COMPONENT TEXT NOT NULL, " +
+                "$COLUMN_USER INTEGER NOT NULL, " +
+                "$COLUMN_FRESHNESS_ID TEXT, " +
+                "$COLUMN_ICON BLOB, " +
+                "$COLUMN_MONO_ICON BLOB, " +
+                "$COLUMN_ICON_COLOR INTEGER NOT NULL DEFAULT 0, " +
+                "$COLUMN_FLAGS INTEGER NOT NULL DEFAULT 0, " +
+                "$COLUMN_LABEL TEXT, " +
+                "PRIMARY KEY ($COLUMN_COMPONENT, $COLUMN_USER) " +
+                ");"
         }
-    }
 
     companion object {
         protected const val TAG = "BaseIconCache"

@@ -18,6 +18,8 @@ package com.android.launcher3.icons
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat.PNG
+import android.graphics.BitmapFactory
+import android.graphics.BitmapFactory.Options
 import android.graphics.BlendMode
 import android.graphics.BlendModeColorFilter
 import android.graphics.Canvas
@@ -35,7 +37,6 @@ import android.graphics.RegionIterator
 import android.util.Log
 import androidx.annotation.ColorInt
 import androidx.core.graphics.ColorUtils.compositeColors
-import com.android.launcher3.icons.GraphicsUtils.resize
 import com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
 import com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR
 import java.io.ByteArrayOutputStream
@@ -72,6 +73,20 @@ object GraphicsUtils {
             return ByteArray(0)
         }
     }
+
+    /** Tries to decode the [ByteArray] into a [Bitmap] consuming any parsing errors */
+    fun ByteArray.parseBitmapSafe(config: Bitmap.Config): Bitmap? =
+        try {
+            BitmapFactory.decodeByteArray(
+                /* data= */ this,
+                /* offset= */ 0,
+                /* length= */ size,
+                Options().apply { inPreferredConfig = config },
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing persisted bitmap", e)
+            null
+        }
 
     /**
      * Try go guesstimate how much space the icon will take when serialized to avoid unnecessary
