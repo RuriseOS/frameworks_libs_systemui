@@ -55,7 +55,7 @@ interface IconThemeController {
     ): ThemedBitmap
 
     fun decode(
-        data: ByteArray,
+        bytes: ByteArray,
         info: BitmapInfo,
         factory: BaseIconFactory,
         sourceHint: SourceHint,
