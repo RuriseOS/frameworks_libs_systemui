@@ -10,6 +10,7 @@ import static com.android.launcher3.icons.BitmapInfo.FLAG_FULL_BLEED;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_INSTANT;
 import static com.android.launcher3.icons.GraphicsUtils.generateIconShape;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
+import static com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR;
 
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
@@ -445,39 +446,35 @@ public class BaseIconFactory implements AutoCloseable {
             @Nullable Bitmap targetBitmap, boolean isFullBleed) {
         final int size = mIconBitmapSize;
         mOldBounds.set(icon.getBounds());
-
+        boolean isFullBleedEnabled = isFullBleed
+                && Flags.enableLauncherIconShapes();
         if (icon instanceof AdaptiveIconDrawable aid) {
-            icon.setBounds(0, 0, size, size);
+            // We are ignoring KEY_SHADOW_DISTANCE because regular icons ignore this at the
+            // moment b/298203449
+            int offset = isFullBleedEnabled
+                    ? 0
+                    : Math.max((int) Math.ceil(BLUR_FACTOR * size),
+                            Math.round(size * (1 - scale) / 2));
+            // b/211896569: AdaptiveIconDrawable do not work properly for non top-left bounds
+            int newBounds = size - offset * 2;
+            icon.setBounds(0, 0, newBounds, newBounds);
+            int count = canvas.save();
+            canvas.translate(offset, offset);
+
+            if ((bitmapGenerationMode == MODE_WITH_SHADOW
+                    || bitmapGenerationMode == MODE_HARDWARE_WITH_SHADOW)
+                    && !isFullBleedEnabled) {
+                getShadowGenerator().addPathShadow(aid.getIconMask(), canvas);
+            }
             if (icon instanceof Extender extender) {
                 extender.drawForPersistence();
             }
-            if (isFullBleed && Flags.enableLauncherIconShapes()) {
-                canvas.drawColor(Color.BLACK);
-                if (aid.getBackground() != null) {
-                    aid.getBackground().draw(canvas);
-                }
-                if (aid.getForeground() != null) {
-                    aid.getForeground().draw(canvas);
-                }
-            } else {
-                GraphicsUtils.resizeToContentSize(canvas, icon.getBounds(), size, size, c -> {
-                    if ((bitmapGenerationMode == MODE_WITH_SHADOW
-                            || bitmapGenerationMode == MODE_HARDWARE_WITH_SHADOW)) {
-                        getShadowGenerator().addPathShadow(aid.getIconMask(), c);
-                    }
-                    boolean shouldDrawDefaultShape = !isFullBleed && mDrawFullBleedIcons;
-                    // TODO: b/421884219 Temporarily keep old implementation until migrated
-                    if (shouldDrawDefaultShape) {
-                        // New Icon shapes path, used for non-full bleed icons
-                        icon.draw(canvas);
-                    } else {
-                        drawShapedAdaptiveIcon(canvas, aid, getShapePath(aid, icon.getBounds()));
-                    }
-                    return null;
-                });
-            }
+
+            drawAdaptiveIcon(canvas, aid, isFullBleedEnabled, getShapePath(aid, icon.getBounds()));
+            canvas.restoreToCount(count);
         } else {
-            if (icon instanceof BitmapDrawable bitmapDrawable) {
+            if (icon instanceof BitmapDrawable) {
+                BitmapDrawable bitmapDrawable = (BitmapDrawable) icon;
                 Bitmap b = bitmapDrawable.getBitmap();
                 if (b != null && b.getDensity() == Bitmap.DENSITY_NONE) {
                     bitmapDrawable.setTargetDensity(mContext.getResources().getDisplayMetrics());
