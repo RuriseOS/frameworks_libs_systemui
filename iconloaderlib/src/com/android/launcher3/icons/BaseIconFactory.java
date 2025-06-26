@@ -245,7 +245,7 @@ public class BaseIconFactory implements AutoCloseable {
         }
 
         if (IconProvider.ATLEAST_T && mThemeController != null && adaptiveIcon != null) {
-            info.setThemedBitmap(
+            info = info.withThemedBitmap(
                     mThemeController.createThemedBitmap(
                         adaptiveIcon,
                         info,

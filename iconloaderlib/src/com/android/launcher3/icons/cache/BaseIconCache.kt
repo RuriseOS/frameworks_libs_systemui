@@ -213,7 +213,7 @@ constructor(
         // Icon can't be loaded from cachingLogic, which implies alternative icon was loaded
         // (e.g. fallback icon, default icon). So we drop here since there's no point in caching
         // an empty entry.
-        if (bitmapInfo.isNullOrLowRes || isDefaultIcon(bitmapInfo, user)) {
+        if (bitmapInfo.isLowRes || isDefaultIcon(bitmapInfo, user)) {
             return
         }
         val entryTitle =
@@ -545,26 +545,35 @@ constructor(
 
             if (!extendibleThemeManager() || lookupFlags.hasThemeIcon()) {
                 // Always set a non-null theme bitmap if theming was requested
-                entry.bitmap.themedBitmap = ThemedBitmap.NOT_SUPPORTED
+                entry.bitmap = entry.bitmap.copy(themedBitmap = ThemedBitmap.NOT_SUPPORTED)
 
                 iconFactory.use { factory ->
                     val themeController = factory.themeController
                     val monoIconData = c.getBlob(INDEX_MONO_ICON)
                     if (themeController != null && monoIconData != null) {
-                        entry.bitmap.themedBitmap =
-                            themeController.decode(
-                                bytes = monoIconData,
-                                info = entry.bitmap,
-                                factory = factory,
-                                sourceHint =
-                                    SourceHint(cacheKey, logic, c.getString(INDEX_FRESHNESS_ID)),
+                        entry.bitmap =
+                            entry.bitmap.copy(
+                                themedBitmap =
+                                    themeController.decode(
+                                        bytes = monoIconData,
+                                        info = entry.bitmap,
+                                        factory = factory,
+                                        sourceHint =
+                                            SourceHint(
+                                                cacheKey,
+                                                logic,
+                                                c.getString(INDEX_FRESHNESS_ID),
+                                            ),
+                                    )
                             )
                     }
                 }
             }
         }
-        entry.bitmap.flags = c.getInt(INDEX_FLAGS)
-        entry.bitmap = entry.bitmap.withFlags(getUserFlagOpLocked(cacheKey.user))
+        entry.bitmap =
+            entry.bitmap.copy(
+                flags = getUserFlagOpLocked(cacheKey.user).apply(c.getInt(INDEX_FLAGS))
+            )
         iconProvider.notifyIconLoaded(entry.bitmap, cacheKey, logic)
         return true
     }
@@ -693,8 +702,7 @@ constructor(
             when {
                 !extendibleThemeManager() -> this
                 flag.useLowRes() -> BitmapInfo.of(LOW_RES_ICON, color)
-                !flag.hasThemeIcon() && themedBitmap != null ->
-                    clone().apply { themedBitmap = null }
+                !flag.hasThemeIcon() && themedBitmap != null -> copy(themedBitmap = null)
                 else -> this
             }
     }
