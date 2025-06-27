@@ -89,6 +89,25 @@ interface PerDisplayRepository<T> {
     /** Gets the cached instance or create a new one for a given display. */
     operator fun get(displayId: Int): T?
 
+    /**
+     * Gets the cached instance or create a new one for a given display. If the given display
+     * doesn't exist, returns an instance for the default display.
+     */
+    fun getOrDefault(displayId: Int): T {
+        val instance = get(displayId)
+        if (instance == null) {
+            Log.e(
+                "PerDisplayRepository",
+                """<$debugName> getOrDefault: instance for display with id $displayId returned 
+                    |null. The display likely doesn't exist anymore. Returning an instance for the 
+                    |default display."""
+                    .trimMargin(),
+            )
+            return get(DEFAULT_DISPLAY)!!
+        }
+        return instance
+    }
+
     /** Debug name for this repository, mainly for tracing and logging. */
     val debugName: String
 
