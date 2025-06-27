@@ -140,6 +140,7 @@ constructor(
                         impl.lastSpringState,
                         impl.lastSegment,
                         impl.lastAnimation,
+                        impl.isOutputFixed,
                     ),
                     impl.isActive,
                     impl.animationFrameDriver.isRunning,
@@ -285,6 +286,7 @@ private class ImperativeComputations(
                     currentSpringState,
                     currentValues.segment,
                     currentValues.animation,
+                    isOutputFixed,
                 )
         }
 

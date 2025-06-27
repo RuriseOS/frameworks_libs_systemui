@@ -60,6 +60,12 @@ object FeatureCaptures {
     val isStable =
         FeatureCapture<DebugInspector, Boolean>("isStable") { it.frame.isStable.asDataPoint() }
 
+    /** Whether the output can change. */
+    val isOutputFixed =
+        FeatureCapture<DebugInspector, Boolean>("isOutputFixed") {
+            it.frame.isOutputFixed.asDataPoint()
+        }
+
     /** A semantic value to capture in the golden. */
     fun <T> semantics(
         key: SemanticKey<T>,

@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ApproachMeasureScope
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.ObserverModifierNode
 import androidx.compose.ui.node.observeReads
@@ -39,8 +40,6 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.mechanics.gestureContextOrDefault
-import com.android.mechanics.MotionValue
-import com.android.mechanics.debug.findMotionValueDebugger
 import com.android.mechanics.effects.RevealOnThreshold
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
@@ -48,8 +47,6 @@ import com.android.mechanics.spec.builder.MotionBuilderContext
 import com.android.mechanics.spec.builder.directionalMotionSpec
 import com.android.mechanics.spec.builder.spatialMotionSpec
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 /**
  * This component remains hidden until its target height meets a minimum threshold. At that point,
@@ -127,22 +124,25 @@ private class VerticalTactileSurfaceRevealNode(
     private var deltaY: Float,
     private var revealOnThreshold: RevealOnThreshold,
     label: String?,
-    private val debug: Boolean,
-) : Modifier.Node(), ApproachLayoutModifierNode, ObserverModifierNode {
+    debug: Boolean,
+) : DelegatingNode(), ApproachLayoutModifierNode, ObserverModifierNode {
 
-    private val motionValue =
-        MotionValue(
-            currentInput = {
-                with(contentScope) {
-                    val containerHeight =
-                        container.lastSize(contentKey)?.height ?: return@MotionValue 0f
-                    containerHeight + deltaY
-                }
-            },
-            initialSpec = MotionSpec(directionalMotionSpec(Mapping.Zero)),
-            gestureContext = contentScope.gestureContextOrDefault(),
-            label = "TactileSurfaceReveal(${label.orEmpty()})",
-            stableThreshold = MotionBuilderContext.StableThresholdSpatial,
+    private val motionValueNode: MotionValueNode =
+        delegate(
+            MotionValueNode(
+                input = {
+                    with(contentScope) {
+                        val containerHeight =
+                            container.lastSize(contentKey)?.height ?: return@MotionValueNode 0f
+                        containerHeight + deltaY
+                    }
+                },
+                gestureContext = contentScope.gestureContextOrDefault(),
+                initialSpec = MotionSpec(directionalMotionSpec(Mapping.Zero)),
+                label = "TactileSurfaceReveal(${label.orEmpty()})",
+                stableThreshold = MotionBuilderContext.StableThresholdSpatial,
+                debug = debug,
+            )
         )
 
     fun update(
@@ -160,29 +160,8 @@ private class VerticalTactileSurfaceRevealNode(
         updateMotionSpec(contentScope.layoutState.transitionState)
     }
 
-    private var motionValueJob: Job? = null
-
     override fun onAttach() {
         onObservedReadsChanged()
-
-        motionValueJob =
-            coroutineScope.launch {
-                val disposableHandle =
-                    if (debug) {
-                        findMotionValueDebugger()?.register(motionValue)
-                    } else {
-                        null
-                    }
-                try {
-                    motionValue.keepRunning()
-                } finally {
-                    disposableHandle?.dispose()
-                }
-            }
-    }
-
-    override fun onDetach() {
-        motionValueJob?.cancel()
     }
 
     override fun onObservedReadsChanged() {
@@ -190,19 +169,16 @@ private class VerticalTactileSurfaceRevealNode(
     }
 
     private var targetBounds = Rect.Zero
-    private var isContentTransition = false
 
     private fun updateMotionSpec(transitionState: TransitionState) {
-        isContentTransition = transitionState is TransitionState.Transition
-
         val height = targetBounds.height
         if (height == 0f) {
             // We cannot compute specs for height 0.
-            motionValue.spec = MotionSpec(directionalMotionSpec(Mapping.Fixed(0f)))
+            motionValueNode.updateSpec(MotionSpec(directionalMotionSpec(Mapping.Fixed(0f))))
             return
         }
 
-        motionValue.spec =
+        motionValueNode.updateSpec(
             when (transitionState) {
                 is TransitionState.Idle -> {
                     val containerMinHeight = 0
@@ -221,6 +197,7 @@ private class VerticalTactileSurfaceRevealNode(
                         }
                     MotionSpec(directionalMotionSpec(Mapping.Fixed(if (isRevealed) height else 0f)))
                 }
+
                 is TransitionState.Transition -> {
                     motionBuilderContext.spatialMotionSpec(Mapping.Zero) {
                         between(
@@ -231,10 +208,11 @@ private class VerticalTactileSurfaceRevealNode(
                     }
                 }
             }
+        )
     }
 
     override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean {
-        return isContentTransition || !motionValue.isStable
+        return !motionValueNode.isOutputFixed
     }
 
     override fun MeasureScope.measure(
@@ -262,7 +240,8 @@ private class VerticalTactileSurfaceRevealNode(
         measurable: Measurable,
         constraints: Constraints,
     ): MeasureResult {
-        val height = motionValue.output.roundToInt().fastCoerceAtLeast(0)
+        val height = motionValueNode.output.roundToInt().fastCoerceAtLeast(0)
+
         val animatedConstraints = constraints.copy(maxHeight = height)
         return measurable.measure(animatedConstraints).run {
             layout(width, height) {

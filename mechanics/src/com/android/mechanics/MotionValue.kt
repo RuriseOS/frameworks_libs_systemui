@@ -142,6 +142,16 @@ class MotionValue(
     val isStable: Boolean by impl::isStable
 
     /**
+     * Whether the output can change its value.
+     *
+     * This is an optimization hint. It returns `true` if the animation spring is at rest AND the
+     * current input maps to a fixed value that is the same as the previous one. In this state, the
+     * output is guaranteed not to change unless the [spec] or the input (enough to change segments)
+     * changes. This can be used to avoid unnecessary work like recomposition or re-measurement.
+     */
+    val isOutputFixed: Boolean by impl::isOutputFixed
+
+    /**
      * The current value for the [SemanticKey].
      *
      * `null` if not defined in the spec.
@@ -236,6 +246,7 @@ class MotionValue(
                         impl.lastSpringState,
                         impl.lastSegment,
                         impl.lastAnimation,
+                        impl.isOutputFixed,
                     ),
                     impl.isActive,
                     impl.debugIsAnimating,
@@ -418,6 +429,7 @@ private class ObservableComputations(
                             capturedSpringState,
                             capturedSegment,
                             capturedAnimation,
+                            isOutputFixed,
                         )
                 }
 

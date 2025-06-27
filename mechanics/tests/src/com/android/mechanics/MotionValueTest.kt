@@ -252,6 +252,66 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         }
 
     @Test
+    fun observeWhen_isOutputFixed() {
+        motion.goldenTest(
+            spec =
+                specBuilder(Mapping.Zero) {
+                    fixedValue(breakpoint = 1f, value = 10f)
+                    fractionalInput(breakpoint = 2f, from = 20f, fraction = 1f)
+                    fixedValue(breakpoint = 3f, value = 10f)
+                },
+            stableThreshold = 1f,
+            capture = {
+                defaultFeatureCaptures()
+                feature(FeatureCaptures.isOutputFixed)
+            },
+        ) {
+            // Segment: Mapping.Zero
+
+            updateInput(0.5f)
+            assertThat(underTest.isOutputFixed).isTrue()
+
+            // Segment: fixedValue(breakpoint = 1f, value = 10f)
+
+            updateInput(1.5f)
+            assertThat(underTest.isOutputFixed).isFalse()
+            awaitStable()
+            assertThat(underTest.isOutputFixed).isFalse()
+            awaitFrames(1)
+            assertThat(underTest.isOutputFixed).isTrue()
+
+            updateInput(1.9f)
+            assertThat(underTest.isOutputFixed).isTrue()
+
+            // Segment: fractionalInput(breakpoint = 2f, from = 20f, fraction = 1f)
+
+            updateInput(2.5f)
+            assertThat(underTest.isOutputFixed).isFalse()
+            awaitStable()
+            assertThat(underTest.isOutputFixed).isFalse()
+            awaitFrames(1)
+            assertThat(underTest.isOutputFixed).isFalse()
+
+            updateInput(2.9f)
+            awaitStable()
+            awaitFrames(1)
+            assertThat(underTest.isOutputFixed).isFalse()
+
+            // Segment: fixedValue(breakpoint = 3f, value = 10f)
+
+            updateInput(3.5f)
+            assertThat(underTest.isOutputFixed).isFalse()
+            awaitStable()
+            assertThat(underTest.isOutputFixed).isFalse()
+            awaitFrames(1)
+            assertThat(underTest.isOutputFixed).isTrue()
+
+            updateInput(3.9f)
+            assertThat(underTest.isOutputFixed).isTrue()
+        }
+    }
+
+    @Test
     fun specChange_shiftSegmentBackwards_doesNotAnimateWithinSegment_animatesSegmentChange() {
         fun generateSpec(offset: Float) =
             specBuilder(Mapping.Zero) {
