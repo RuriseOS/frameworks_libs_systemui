@@ -174,7 +174,11 @@ public class BaseIconFactory implements AutoCloseable {
                 new ColorDrawable(PLACEHOLDER_BACKGROUND_COLOR),
                 new CenterTextDrawable(placeholder, color));
         Bitmap icon = createIconBitmap(drawable, ICON_VISIBLE_AREA_FACTOR);
-        return BitmapInfo.of(icon, color, getDefaultIconShape());
+        BitmapInfo info = BitmapInfo.of(icon, color, getDefaultIconShape());
+        if (mDrawFullBleedIcons) {
+            info = info.withFlags(FlagOp.NO_OP.addFlag(FLAG_FULL_BLEED));
+        }
+        return info;
     }
 
     public BitmapInfo createIconBitmap(Bitmap icon) {
@@ -262,7 +266,6 @@ public class BaseIconFactory implements AutoCloseable {
      * Generates an IconShape based on the current bitmap size and default icon mask.
      */
     public IconShape getDefaultIconShape() {
-        if (!mDrawFullBleedIcons) return IconShape.EMPTY;
         if (mDefaultIconShape != null) return mDefaultIconShape;
         AdaptiveIconDrawable tempAdaptiveIcon =
                 new AdaptiveIconDrawable(new ColorDrawable(BLACK), null);

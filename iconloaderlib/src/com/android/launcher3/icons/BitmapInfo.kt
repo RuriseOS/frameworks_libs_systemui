@@ -21,6 +21,7 @@ import android.graphics.drawable.Drawable
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.IntDef
+import com.android.launcher3.icons.BitmapInfo.Companion.FLAG_THEMED
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.SimpleDelegateFactory
 import com.android.launcher3.icons.PlaceHolderDrawableDelegate.PlaceHolderDelegateFactory
@@ -246,13 +247,7 @@ data class BitmapInfo(
 
         @JvmStatic
         fun of(bitmap: Bitmap, color: Int, defaultShape: IconShape = IconShape.EMPTY): BitmapInfo {
-            val flags = if (defaultShape == IconShape.EMPTY) 0 else FLAG_FULL_BLEED
-            return BitmapInfo(
-                icon = bitmap,
-                color = color,
-                defaultIconShape = defaultShape,
-                flags = flags,
-            )
+            return BitmapInfo(icon = bitmap, color = color, defaultIconShape = defaultShape)
         }
     }
 }
