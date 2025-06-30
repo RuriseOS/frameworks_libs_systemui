@@ -14,8 +14,11 @@
 package com.android.launcher3.icons
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.util.Log
 import androidx.annotation.FloatRange
+import androidx.annotation.VisibleForTesting
 import androidx.core.graphics.ColorUtils
 import kotlin.math.abs
 
@@ -26,9 +29,6 @@ enum class ComputationType {
 
     /** Compute the average luminance of a drawable or a bitmap. */
     AVERAGE,
-
-    /** Compute the difference between the min and max luminance of a drawable or a bitmap. */
-    SPREAD,
 }
 
 /** Wrapper for the color space to use when computing the luminance. */
@@ -142,6 +142,7 @@ class LuminanceComputer(
         val targetColorWrapper = colorToColorWrapper(targetColor)
         val basisColorWrapper = colorToColorWrapper(basisColor)
 
+        val originalTargetLuminance = targetColorWrapper.luminance
         val basisLuminance = basisColorWrapper.luminance
 
         // The target luminance should be between 0 and 1, so we need to clamp
@@ -162,13 +163,21 @@ class LuminanceComputer(
     }
 
     /**
+     * Compute the luminance of a drawable using the selected color space.
+     *
+     * @param drawable The drawable to compute the luminance of.
+     */
+    fun computeLuminance(drawable: Drawable): Double {
+        val bitmap = createBitmapFromDrawable(drawable)
+        return computeLuminance(bitmap)
+    }
+
+    /**
      * Compute the luminance of a bitmap using the selected color space.
      *
      * @param bitmap The bitmap to compute the luminance of.
-     * @param scale if true, the bitmap is resized to [BITMAP_SAMPLE_SIZE] for color calculation
      */
-    @JvmOverloads
-    fun computeLuminance(bitmap: Bitmap, scale: Boolean = true): Double {
+    fun computeLuminance(bitmap: Bitmap, scale: Boolean = false): Double {
         val bitmapHeight = bitmap.height
         val bitmapWidth = bitmap.width
         if (bitmapHeight == 0 || bitmapWidth == 0) {
@@ -208,7 +217,42 @@ class LuminanceComputer(
         when (computationType) {
             ComputationType.MEDIAN -> return luminances.sorted().median()
             ComputationType.AVERAGE -> return luminances.average()
-            ComputationType.SPREAD -> return luminances.max() - luminances.min()
+        }
+    }
+
+    private fun scaleBitmap(
+        bitmap: Bitmap,
+        targetWidth: Int,
+        targetHeight: Int,
+        filter: Boolean,
+    ): Bitmap {
+        if (targetWidth <= 0 || targetHeight <= 0) {
+            Log.w(TAG, "Invalid dimensions for scaling: $targetWidth x $targetHeight")
+            return bitmap
+        }
+        return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, filter)
+    }
+
+    private fun createBitmapFromDrawable(drawable: Drawable): Bitmap {
+        val b = Bitmap.createBitmap(BITMAP_SAMPLE_SIZE, BITMAP_SAMPLE_SIZE, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, BITMAP_SAMPLE_SIZE, BITMAP_SAMPLE_SIZE)
+        drawable.draw(Canvas(b))
+        return b
+    }
+
+    /**
+     * Scale the height and width of a bitmap to a maximum size.
+     *
+     * @param height The height of the bitmap.
+     * @param width The width of the bitmap.
+     * @return A pair of the scaled height and width.
+     */
+    @VisibleForTesting
+    fun scaleHeightAndWidth(height: Int, width: Int): Pair<Int, Int> {
+        if (height > width) {
+            return Pair(BITMAP_SAMPLE_SIZE, (width * BITMAP_SAMPLE_SIZE) / height)
+        } else {
+            return Pair((height * BITMAP_SAMPLE_SIZE) / width, BITMAP_SAMPLE_SIZE)
         }
     }
 
@@ -254,12 +298,12 @@ class LuminanceComputer(
             LuminanceColorSpace.HSL -> {
                 val hsl = FloatArray(3)
                 ColorUtils.colorToHSL(color, hsl)
-                HslColor(hsl)
+                return HslColor(hsl)
             }
             LuminanceColorSpace.LAB -> {
                 val lab = DoubleArray(3)
                 ColorUtils.colorToLAB(color, lab)
-                LabColor(lab)
+                return LabColor(lab)
             }
         }
     }
@@ -288,13 +332,10 @@ class LuminanceComputer(
         const val DEFAULT_ABSOLUTE_LUMINANCE_DELTA = 0.1
 
         @JvmStatic
-        @JvmOverloads
-        fun createDefaultLuminanceComputer(
-            computationType: ComputationType = ComputationType.AVERAGE
-        ): LuminanceComputer {
+        fun createDefaultLuminanceComputer(): LuminanceComputer {
             return LuminanceComputer(
                 LuminanceColorSpace.LAB, // Keep this as the default color space
-                computationType,
+                ComputationType.AVERAGE,
                 Options(
                     ensureMinContrast = ENABLED_CONTRAST_ADJUSTMENT,
                     absoluteLuminanceDelta = ENABLED_ABSOLUTE_LUMINANCE_DELTA,
