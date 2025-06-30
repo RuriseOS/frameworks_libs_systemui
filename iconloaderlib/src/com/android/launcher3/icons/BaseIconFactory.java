@@ -270,7 +270,8 @@ public class BaseIconFactory implements AutoCloseable {
         AdaptiveIconDrawable tempAdaptiveIcon =
                 new AdaptiveIconDrawable(new ColorDrawable(BLACK), null);
         tempAdaptiveIcon.setBounds(0, 0, mIconBitmapSize, mIconBitmapSize);
-        mDefaultIconShape = generateIconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask());
+        mDefaultIconShape = generateIconShape(mIconBitmapSize, tempAdaptiveIcon.getIconMask(),
+                DefaultRenderer.INSTANCE);
         return mDefaultIconShape;
     }
 
