@@ -29,6 +29,7 @@ import android.graphics.Bitmap
 import android.graphics.Bitmap.Config.HARDWARE
 import android.graphics.BitmapFactory
 import android.graphics.BitmapFactory.Options
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
@@ -381,8 +382,8 @@ constructor(
             iconFactory.use { li ->
                 entry.bitmap =
                     li.createBadgedIconBitmap(
-                        li.createShapedAdaptiveIcon(icon),
-                        IconOptions().setUser(user),
+                        BitmapDrawable(icon),
+                        IconOptions().setUser(user).assumeFullBleedIcon(true),
                     )
             }
         }

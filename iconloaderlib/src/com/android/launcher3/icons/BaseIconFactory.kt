@@ -45,6 +45,7 @@ import com.android.launcher3.util.FlagOp
 import com.android.launcher3.util.UserIconInfo
 import com.android.launcher3.util.UserIconInfo.TYPE_MAIN
 import com.android.launcher3.util.UserIconInfo.TYPE_WORK
+import com.android.systemui.shared.Flags.extendibleThemeManager
 import kotlin.annotation.AnnotationRetention.SOURCE
 import kotlin.math.ceil
 import kotlin.math.max
@@ -137,17 +138,6 @@ constructor(
         return of(updatedIcon, findDominantColorByHue(updatedIcon), defaultIconShape)
     }
 
-    /** Creates an icon from the bitmap cropped to the current device icon shape */
-    fun createShapedAdaptiveIcon(iconBitmap: Bitmap): AdaptiveIconDrawable {
-        val drawable: Drawable = FixedSizeBitmapDrawable(iconBitmap)
-        var inset = AdaptiveIconDrawable.getExtraInsetFraction()
-        inset /= (1 + 2 * inset)
-        return AdaptiveIconDrawable(
-            ColorDrawable(Color.BLACK),
-            InsetDrawable(drawable, inset, inset, inset, inset),
-        )
-    }
-
     /**
      * Creates bitmap using the source drawable and various parameters. The bitmap is visually
      * normalized with other icons and has enough spacing to add shadow.
@@ -163,11 +153,16 @@ constructor(
                     icon = BitmapRenderer.createSoftwareBitmap(iconBitmapSize, iconBitmapSize) {},
                     color = 0,
                 )
-        if (options != null && options.mIsArchived && icon is BitmapDrawable) {
-            // b/358123888
-            // Pre-archived apps can have BitmapDrawables without insets.
-            // Need to convert to Adaptive Icon with insets to avoid cropping.
-            icon.bitmap.let { tempIcon = createShapedAdaptiveIcon(it) }
+        if (options != null && options.mIsFullBleed && icon is BitmapDrawable) {
+            // If the source is a full-bleed icon, create an adaptive icon by insetting this icon to
+            // the extra padding
+            var inset = AdaptiveIconDrawable.getExtraInsetFraction()
+            inset /= (1 + 2 * inset)
+            tempIcon =
+                AdaptiveIconDrawable(
+                    ColorDrawable(Color.BLACK),
+                    InsetDrawable(icon, inset, inset, inset, inset),
+                )
         }
 
         val adaptiveIcon = wrapToAdaptiveIcon(tempIcon, options)
@@ -203,6 +198,8 @@ constructor(
                             options?.mSourceHint,
                         )
                 )
+        } else if (extendibleThemeManager()) {
+            info = info.copy(themedBitmap = ThemedBitmap.NOT_SUPPORTED)
         }
 
         return info
@@ -409,7 +406,7 @@ constructor(
     class IconOptions {
         var mIsInstantApp: Boolean = false
 
-        var mIsArchived: Boolean = false
+        var mIsFullBleed: Boolean = false
 
         @BitmapGenerationMode var mGenerationMode: Int = MODE_WITH_SHADOW
 
@@ -431,8 +428,11 @@ constructor(
         /** If this icon represents an instant app */
         fun setInstantApp(instantApp: Boolean) = apply { mIsInstantApp = instantApp }
 
-        /** If the icon represents an archived app */
-        fun setIsArchived(isArchived: Boolean) = apply { mIsArchived = isArchived }
+        /**
+         * If the icon is [BitmapDrawable], assumes that it is a full bleed icon and tries to shape
+         * it accordingly
+         */
+        fun assumeFullBleedIcon(isFullBleed: Boolean) = apply { mIsFullBleed = isFullBleed }
 
         /** Disables auto color extraction and overrides the color to the provided value */
         fun setExtractedColor(@ColorInt color: Int) = apply { mExtractedColor = color }
@@ -454,18 +454,6 @@ constructor(
             mWrapperBackgroundColor =
                 if (Color.alpha(color) < 255) DEFAULT_WRAPPER_BACKGROUND else color
         }
-    }
-
-    /**
-     * An extension of [BitmapDrawable] which returns the bitmap pixel size as intrinsic size. This
-     * allows the badging to be done based on the action bitmap size rather than the scaled bitmap
-     * size.
-     */
-    private class FixedSizeBitmapDrawable(bitmap: Bitmap) : BitmapDrawable(null, bitmap) {
-
-        override fun getIntrinsicHeight(): Int = bitmap.width
-
-        override fun getIntrinsicWidth(): Int = bitmap.width
     }
 
     private class NoopDrawable : ColorDrawable() {
