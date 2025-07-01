@@ -23,16 +23,17 @@ import android.graphics.Bitmap.Config.ALPHA_8
 import android.graphics.Bitmap.Config.HARDWARE
 import android.graphics.BlendMode.SRC_IN
 import android.graphics.BlendModeColorFilter
+import android.graphics.Canvas
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.AdaptiveIconDrawable.getExtraInsetFraction
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import com.android.launcher3.Flags
 import com.android.launcher3.icons.BaseIconFactory
-import com.android.launcher3.icons.BaseIconFactory.Companion.MODE_ALPHA
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.ClockDrawableWrapper.ClockAnimationInfo
 import com.android.launcher3.icons.IconThemeController
@@ -75,12 +76,7 @@ class MonoIconThemeController(
         val mono = icon.monochrome
         if (mono != null) {
             return MonoThemedBitmap(
-                factory.createIconBitmap(
-                    InsetDrawable(mono, -getExtraInsetFraction()),
-                    1f /* scale */,
-                    MODE_ALPHA,
-                    true, /* isFullBleed */
-                ),
+                InsetDrawable(mono, -getExtraInsetFraction()).toAlphaBitmap(factory.iconBitmapSize),
                 colorProvider,
             )
         }
@@ -89,18 +85,20 @@ class MonoIconThemeController(
             val monoFactory = MonochromeIconFactory(info.icon.width)
             val wrappedIcon = monoFactory.wrap(icon)
             return MonoThemedBitmap(
-                factory.createIconBitmap(
-                    wrappedIcon,
-                    1f /* scale */,
-                    MODE_ALPHA,
-                    true, /* isFullBleed */
-                ),
+                wrappedIcon.toAlphaBitmap(factory.iconBitmapSize),
                 colorProvider,
                 monoFactory.luminanceDiff,
             )
         }
 
         return ThemedBitmap.NOT_SUPPORTED
+    }
+
+    private fun Drawable.toAlphaBitmap(size: Int): Bitmap {
+        val result = Bitmap.createBitmap(size, size, ALPHA_8)
+        setBounds(0, 0, size, size)
+        draw(Canvas(result))
+        return result
     }
 
     override fun decode(
