@@ -136,7 +136,7 @@ constructor(
 
         canvas.resizeToContentSize(bounds, iconShape.pathSize.toFloat()) {
             paint.shader = shader
-            drawPath(iconShape.path, paint)
+            iconShape.shapeRenderer.render(iconShape.path, canvas, paint)
             paint.shader = null
         }
     }

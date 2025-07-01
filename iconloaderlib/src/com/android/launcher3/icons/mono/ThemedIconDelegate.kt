@@ -93,6 +93,7 @@ class ThemedIconDelegate(
             return intArrayOf(
                 res.getColor(R.color.themed_icon_background_color),
                 res.getColor(R.color.themed_icon_color),
+                res.getColor(R.color.themed_icon_adaptive_background_color),
             )
         }
     }

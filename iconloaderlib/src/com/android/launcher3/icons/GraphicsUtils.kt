@@ -165,7 +165,11 @@ object GraphicsUtils {
      * [size]]
      */
     @JvmStatic
-    fun generateIconShape(size: Int, shapePath: Path): IconShape {
+    fun generateIconShape(
+        size: Int,
+        shapePath: Path,
+        shapeRenderer: ShapeRenderer = DefaultRenderer
+    ): IconShape {
         // Generate shadow layer:
         // Based on adaptive icon drawing in BaseIconFactory
         val offset =
@@ -182,7 +186,12 @@ object GraphicsUtils {
                     ShadowGenerator(size).addPathShadow(drawnPath, canvas)
                 }
             }
-        return IconShape(pathSize = size, path = shapePath, shadowLayer = shadowLayer)
+        return IconShape(
+            pathSize = size,
+            path = shapePath,
+            shadowLayer = shadowLayer,
+            shapeRenderer = shapeRenderer
+        )
     }
 
     /** Returns a color filter which is equivalent to [filter] x BlendModeFilter with [color] */
