@@ -166,7 +166,7 @@ flag {
     name: "smartspace_consolidated_weather_layout"
     namespace: "systemui"
     description: "Enable consolidated weather cards in Smartspace"
-    bug: "416745891"
+    bug: "428972035"
     metadata {
          purpose: PURPOSE_BUGFIX
     }
