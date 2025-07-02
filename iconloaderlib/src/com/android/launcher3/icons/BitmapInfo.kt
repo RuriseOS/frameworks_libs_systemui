@@ -71,6 +71,9 @@ data class BitmapInfo(
     fun withFlags(op: FlagOp): BitmapInfo =
         if (op === FlagOp.NO_OP) this else copy(flags = op.apply(this.flags))
 
+    /** Helper class to allow copy from java code */
+    fun withThemedBitmap(themedBitmap: ThemedBitmap?) = copy(themedBitmap = themedBitmap)
+
     val isLowRes: Boolean
         get() = matchingLookupFlag.useLowRes()
 

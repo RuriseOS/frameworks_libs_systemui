@@ -74,13 +74,11 @@ public class BubbleIconFactory extends BaseIconFactory {
      * drawing the actual drawable. This is used for the larger icon shown for the bubble.
      */
     public Bitmap getBubbleBitmap(@NonNull Drawable icon, float[] outScale) {
-        if (outScale != null) {
-            outScale[0] = IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
+        if (outScale == null) {
+            outScale = new float[1];
         }
-        return createIconBitmap(
-                wrapToAdaptiveIcon(icon),
-                IconNormalizer.ICON_VISIBLE_AREA_FACTOR,
-                MODE_WITH_SHADOW);
+        icon = normalizeAndWrapToAdaptiveIcon(icon, outScale);
+        return createIconBitmap(icon, outScale[0], MODE_WITH_SHADOW, mDrawFullBleedIcons);
     }
 
     /**
@@ -97,7 +95,7 @@ public class BubbleIconFactory extends BaseIconFactory {
             userBadgedAppIcon = new CircularRingDrawable(userBadgedAppIcon);
         }
         Bitmap userBadgedBitmap = mBadgeFactory.createIconBitmap(
-                userBadgedAppIcon, 1, MODE_WITH_SHADOW);
+                userBadgedAppIcon, 1, MODE_WITH_SHADOW, mDrawFullBleedIcons);
         return mBadgeFactory.createIconBitmap(userBadgedBitmap);
     }
 
