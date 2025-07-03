@@ -65,6 +65,7 @@ internal constructor(
     val springState: SpringState,
     private val segment: SegmentData,
     private val animation: DiscontinuityAnimation,
+    val isOutputFixed: Boolean,
 ) {
     val isStable: Boolean
         get() = springState == SpringState.AtRest
