@@ -83,14 +83,12 @@ constructor(
 
     /** Default IconShape for when custom shape is not needed */
     val defaultIconShape: IconShape by lazy {
-        if (!drawFullBleedIcons) IconShape.EMPTY
-        else
-            generateIconShape(
-                iconBitmapSize,
-                AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
-                    .apply { setBounds(0, 0, iconBitmapSize, iconBitmapSize) }
-                    .iconMask,
-            )
+        generateIconShape(
+            iconBitmapSize,
+            AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
+                .apply { setBounds(0, 0, iconBitmapSize, iconBitmapSize) }
+                .iconMask,
+        )
     }
 
     @Suppress("deprecation")
