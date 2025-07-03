@@ -124,7 +124,7 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
                                         contentScope = contentScope,
                                         motionBuilderContext = rememberMotionBuilderContext(),
                                         container = ContainerElement,
-                                        debug = it == 1,
+                                        label = "box$it",
                                     )
                                     .size(50.dp)
                             )

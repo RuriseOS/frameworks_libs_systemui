@@ -153,6 +153,46 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                 currentSpringState == SpringState.AtRest
             }
 
+    /**
+     * Determines if the output value is fixed.
+     *
+     * The output is considered fixed if the animation has settled and the input falls into a
+     * segment with a [Mapping.Fixed], and that mapping's value has not changed from the previous
+     * frame.
+     */
+    val isOutputFixed: Boolean
+        get() {
+            if (lastSpringState != SpringState.AtRest) {
+                // The spring is still settling.
+                return false
+            }
+
+            val lastMapping = lastSegment.mapping
+            if (lastMapping !is Mapping.Fixed) {
+                // We need to compute a new output value.
+                return false
+            }
+
+            val isSameSegment =
+                lastSegment.spec == spec &&
+                    lastSegment.isValidForInput(currentInput, currentDirection)
+
+            return if (isSameSegment) {
+                // We are in the same fixed-value segment as the last frame.
+                true
+            } else {
+                val currentMapping = currentComputedValues.segment.mapping
+                if (currentMapping is Mapping.Fixed) {
+                    // Both old and new mappings are fixed. The output is only considered fixed if
+                    // their target values are identical.
+                    lastMapping.value == currentMapping.value
+                } else {
+                    // The new mapping isn't a fixed value.
+                    false
+                }
+            }
+        }
+
     fun <T> semanticState(semanticKey: SemanticKey<T>): T? {
         return with(if (isSameSegmentAndAtRest) lastSegment else currentComputedValues.segment) {
             spec.semanticState(semanticKey, key)

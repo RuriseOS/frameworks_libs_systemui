@@ -62,6 +62,7 @@ constructor(
     @JvmField val iconBitmapSize: Int,
     private val drawFullBleedIcons: Boolean = false,
     val themeController: IconThemeController? = null,
+    private val defaultShapeRenderer: ShapeRenderer = DefaultRenderer
 ) : AutoCloseable {
 
     @Retention(SOURCE)
@@ -88,6 +89,7 @@ constructor(
             AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
                 .apply { setBounds(0, 0, iconBitmapSize, iconBitmapSize) }
                 .iconMask,
+            defaultShapeRenderer
         )
     }
 
