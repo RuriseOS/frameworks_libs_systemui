@@ -18,12 +18,10 @@ package com.android.launcher3.icons
 import android.content.Context
 import android.content.Intent.ShortcutIconResource
 import android.graphics.Bitmap
-import android.graphics.Bitmap.Config.ALPHA_8
 import android.graphics.Bitmap.Config.ARGB_8888
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PaintFlagsDrawFilter
 import android.graphics.Rect
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.BitmapDrawable
@@ -34,12 +32,11 @@ import android.os.UserHandle
 import android.util.SparseArray
 import androidx.annotation.ColorInt
 import androidx.annotation.IntDef
-import com.android.launcher3.Flags
-import com.android.launcher3.icons.BitmapInfo.Companion.of
 import com.android.launcher3.icons.BitmapInfo.Extender
 import com.android.launcher3.icons.ColorExtractor.findDominantColorByHue
 import com.android.launcher3.icons.GraphicsUtils.generateIconShape
 import com.android.launcher3.icons.GraphicsUtils.transformed
+import com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
 import com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR
 import com.android.launcher3.util.FlagOp
 import com.android.launcher3.util.UserIconInfo
@@ -65,20 +62,7 @@ constructor(
     private val defaultShapeRenderer: ShapeRenderer = DefaultRenderer
 ) : AutoCloseable {
 
-    @Retention(SOURCE)
-    @IntDef(MODE_DEFAULT, MODE_ALPHA, MODE_WITH_SHADOW, MODE_HARDWARE_WITH_SHADOW, MODE_HARDWARE)
-    internal annotation class BitmapGenerationMode
-
-    private val mOldBounds = Rect()
-
     private val cachedUserInfo = SparseArray<UserIconInfo>()
-
-    protected val mContext: Context = context.applicationContext
-
-    private val mCanvas =
-        Canvas().apply {
-            drawFilter = PaintFlagsDrawFilter(Paint.DITHER_FLAG, Paint.FILTER_BITMAP_FLAG)
-        }
 
     private val shadowGenerator: ShadowGenerator by lazy { ShadowGenerator(iconBitmapSize) }
 
@@ -96,7 +80,7 @@ constructor(
     @Suppress("deprecation")
     fun createIconBitmap(iconRes: ShortcutIconResource): BitmapInfo? {
         try {
-            val resources = mContext.packageManager.getResourcesForApplication(iconRes.packageName)
+            val resources = context.packageManager.getResourcesForApplication(iconRes.packageName)
             if (resources != null) {
                 val id = resources.getIdentifier(iconRes.resourceName, null, null)
                 // do not stamp old legacy shortcuts as the app may have already forgotten about it
@@ -114,29 +98,56 @@ constructor(
      * @param placeholder used for foreground element in the icon bitmap
      * @param color used for the foreground text color
      */
-    fun createIconBitmap(placeholder: String, color: Int): BitmapInfo {
-        val drawable =
+    fun createIconBitmap(placeholder: String, color: Int): BitmapInfo =
+        createBadgedIconBitmap(
             AdaptiveIconDrawable(
                 ColorDrawable(PLACEHOLDER_BACKGROUND_COLOR),
                 CenterTextDrawable(placeholder, color),
-            )
-        val icon = createIconBitmap(drawable, IconNormalizer.ICON_VISIBLE_AREA_FACTOR)
-        return BitmapInfo(
-            icon = icon,
-            color = color,
-            defaultIconShape = defaultIconShape,
-            flags = if (drawFullBleedIcons) BitmapInfo.FLAG_FULL_BLEED else 0,
+            ),
+            IconOptions().setExtractedColor(color),
         )
-    }
 
-    fun createIconBitmap(icon: Bitmap): BitmapInfo {
-        val updatedIcon =
-            if (iconBitmapSize != icon.width || iconBitmapSize != icon.height)
-                createIconBitmap(BitmapDrawable(mContext.resources, icon), 1f)
-            else icon
+    fun createIconBitmap(icon: Bitmap): BitmapInfo =
+        if (iconBitmapSize != icon.width || iconBitmapSize != icon.height)
+            createBadgedIconBitmap(
+                BitmapDrawable(context.resources, icon),
+                IconOptions()
+                    .setWrapNonAdaptiveIcon(false)
+                    .setIconScale(1f)
+                    .assumeFullBleedIcon(icon.width == icon.height && !icon.hasAlpha()),
+            )
+        else
+            BitmapInfo(
+                icon = icon,
+                color = findDominantColorByHue(icon),
+                defaultIconShape = defaultIconShape,
+                flags = if (icon.hasAlpha()) 0 else BitmapInfo.FLAG_FULL_BLEED,
+            )
 
-        return of(updatedIcon, findDominantColorByHue(updatedIcon), defaultIconShape)
-    }
+    fun createScaledBitmap(icon: Drawable, @BitmapGenerationMode mode: Int): Bitmap =
+        createBadgedIconBitmap(
+                icon,
+                IconOptions().setBitmapGenerationMode(mode).setDrawFullBleed(false),
+            )
+            .icon
+
+    @JvmOverloads
+    @Deprecated("Use createBadgedIconBitmap instead")
+    fun createIconBitmap(
+        icon: Drawable?,
+        scale: Float,
+        @BitmapGenerationMode bitmapGenerationMode: Int = MODE_DEFAULT,
+        isFullBleed: Boolean = drawFullBleedIcons,
+    ): Bitmap =
+        createBadgedIconBitmap(
+                icon,
+                IconOptions()
+                    .setBitmapGenerationMode(bitmapGenerationMode)
+                    .setWrapNonAdaptiveIcon(false)
+                    .setDrawFullBleed(isFullBleed)
+                    .setIconScale(scale),
+            )
+            .icon
 
     /**
      * Creates bitmap using the source drawable and various parameters. The bitmap is visually
@@ -146,14 +157,22 @@ constructor(
      * @return a bitmap suitable for displaying as an icon at various system UIs.
      */
     @JvmOverloads
-    fun createBadgedIconBitmap(icon: Drawable?, options: IconOptions? = null): BitmapInfo {
-        var tempIcon =
-            icon
-                ?: return BitmapInfo(
-                    icon = BitmapRenderer.createSoftwareBitmap(iconBitmapSize, iconBitmapSize) {},
-                    color = 0,
-                )
-        if (options != null && options.mIsFullBleed && icon is BitmapDrawable) {
+    fun createBadgedIconBitmap(icon: Drawable?, options: IconOptions = IconOptions()): BitmapInfo {
+        if (icon == null) {
+            return BitmapInfo(
+                icon =
+                    if (options.useHardware)
+                        BitmapRenderer.createHardwareBitmap(iconBitmapSize, iconBitmapSize) {}
+                    else Bitmap.createBitmap(iconBitmapSize, iconBitmapSize, ARGB_8888),
+                color = 0,
+            )
+        }
+
+        // Create the bitmap first
+        val oldBounds = icon.bounds
+
+        var tempIcon: Drawable = icon
+        if (options.isFullBleed && icon is BitmapDrawable) {
             // If the source is a full-bleed icon, create an adaptive icon by insetting this icon to
             // the extra padding
             var inset = AdaptiveIconDrawable.getExtraInsetFraction()
@@ -164,39 +183,38 @@ constructor(
                     InsetDrawable(icon, inset, inset, inset, inset),
                 )
         }
+        if (options.wrapNonAdaptiveIcon) tempIcon = wrapToAdaptiveIcon(tempIcon, options)
 
-        val adaptiveIcon = wrapToAdaptiveIcon(tempIcon, options)
-        val bitmap =
-            createIconBitmap(
-                adaptiveIcon,
-                IconNormalizer.ICON_VISIBLE_AREA_FACTOR,
-                options?.mGenerationMode ?: MODE_WITH_SHADOW,
-                drawFullBleedIcons,
-            )
-        val color = options?.mExtractedColor ?: findDominantColorByHue(bitmap)
-        var info = of(bitmap, color, defaultIconShape)
+        val bitmap = drawableToBitmap(tempIcon, options)
+        icon.bounds = oldBounds
 
+        val color = options.extractedColor ?: findDominantColorByHue(bitmap)
         var flagOp = getBitmapFlagOp(options)
-        if (adaptiveIcon is WrappedAdaptiveIcon) {
-            flagOp = flagOp.addFlag(BitmapInfo.FLAG_WRAPPED_NON_ADAPTIVE)
-        }
         if (drawFullBleedIcons) flagOp = flagOp.addFlag(BitmapInfo.FLAG_FULL_BLEED)
-        info = info.withFlags(flagOp)
 
-        if (adaptiveIcon is Extender) {
-            info = adaptiveIcon.getUpdatedBitmapInfo(info, this)
+        var info =
+            BitmapInfo(
+                icon = bitmap,
+                color = color,
+                defaultIconShape = defaultIconShape,
+                flags = flagOp.apply(0),
+            )
+        if (icon is Extender) {
+            info = icon.getUpdatedBitmapInfo(info, this)
         }
 
         if (IconProvider.ATLEAST_T && themeController != null) {
             info =
                 info.copy(
                     themedBitmap =
-                        themeController.createThemedBitmap(
-                            adaptiveIcon,
-                            info,
-                            this,
-                            options?.mSourceHint,
-                        )
+                        if (tempIcon is AdaptiveIconDrawable)
+                            themeController.createThemedBitmap(
+                                tempIcon,
+                                info,
+                                this,
+                                options.sourceHint,
+                            )
+                        else ThemedBitmap.NOT_SUPPORTED
                 )
         } else if (extendibleThemeManager()) {
             info = info.copy(themedBitmap = ThemedBitmap.NOT_SUPPORTED)
@@ -208,19 +226,17 @@ constructor(
     fun getBitmapFlagOp(options: IconOptions?): FlagOp {
         if (options == null) return FlagOp.NO_OP
         var op = FlagOp.NO_OP
-        if (options.mIsInstantApp) op = op.addFlag(BitmapInfo.FLAG_INSTANT)
+        if (options.isInstantApp) op = op.addFlag(BitmapInfo.FLAG_INSTANT)
 
-        val info = options.mUserIconInfo ?: options.mUserHandle?.let { getUserInfo(it) }
+        val info = options.userIconInfo ?: options.userHandle?.let { getUserInfo(it) }
         if (info != null) op = info.applyBitmapInfoFlags(op)
         return op
     }
 
     protected open fun getUserInfo(user: UserHandle): UserIconInfo {
         val key = user.hashCode()
-        /*
-         * We do not have the ability to distinguish between different badged users here.
-         * As such all badged users will have the work profile badge applied.
-         */
+        // We do not have the ability to distinguish between different badged users here.
+        // As such all badged users will have the work profile badge applied.
         return cachedUserInfo[key]
             ?: UserIconInfo(user, if (user.isWorkUser()) TYPE_WORK else TYPE_MAIN).also {
                 cachedUserInfo[key] = it
@@ -229,21 +245,17 @@ constructor(
 
     /** Simple check to check if the provided user is work profile or not based on badging */
     private fun UserHandle.isWorkUser() =
-        NoopDrawable().let { d -> d !== mContext.packageManager.getUserBadgedIcon(d, this) }
+        NoopDrawable().let { d -> d !== context.packageManager.getUserBadgedIcon(d, this) }
 
-    fun createScaledBitmap(icon: Drawable, @BitmapGenerationMode mode: Int): Bitmap {
-        return createIconBitmap(
-            wrapToAdaptiveIcon(icon),
-            IconNormalizer.ICON_VISIBLE_AREA_FACTOR,
-            mode,
-            false,
-        )
-    }
-
-    /** Returns a drawable which draws the original drawable at a fixed scale */
-    private fun createScaledDrawable(main: Drawable, scale: Float): Drawable {
-        val h = main.intrinsicHeight.toFloat()
-        val w = main.intrinsicWidth.toFloat()
+    /**
+     * Wraps this drawable in [InsetDrawable] such that the final drawable has square bounds, while
+     * preserving the aspect ratio of the source
+     *
+     * @param scale additional scale on the source drawable
+     */
+    private fun Drawable.wrapIntoSquareDrawable(scale: Float): Drawable {
+        val h = intrinsicHeight.toFloat()
+        val w = intrinsicWidth.toFloat()
         var scaleX = scale
         var scaleY = scale
         if (h > w && w > 0) {
@@ -253,146 +265,87 @@ constructor(
         }
         scaleX = (1 - scaleX) / 2
         scaleY = (1 - scaleY) / 2
-        return InsetDrawable(main, scaleX, scaleY, scaleX, scaleY)
+        return InsetDrawable(this, scaleX, scaleY, scaleX, scaleY)
     }
 
     /** Wraps the provided icon in an adaptive icon drawable */
     @JvmOverloads
     fun wrapToAdaptiveIcon(icon: Drawable, options: IconOptions? = null): AdaptiveIconDrawable =
         icon as? AdaptiveIconDrawable
-            ?: WrappedAdaptiveIcon(
-                    ColorDrawable(options?.mWrapperBackgroundColor ?: DEFAULT_WRAPPER_BACKGROUND),
-                    createScaledDrawable(
-                        icon,
-                        IconNormalizer(iconBitmapSize).getScale(icon) * LEGACY_ICON_SCALE,
+            ?: AdaptiveIconDrawable(
+                    ColorDrawable(options?.wrapperBackgroundColor ?: DEFAULT_WRAPPER_BACKGROUND),
+                    icon.wrapIntoSquareDrawable(
+                        IconNormalizer(iconBitmapSize).getScale(icon) * LEGACY_ICON_SCALE
                     ),
                 )
                 .apply { setBounds(0, 0, 1, 1) }
 
-    @JvmOverloads
-    fun createIconBitmap(
-        icon: Drawable?,
-        scale: Float,
-        @BitmapGenerationMode bitmapGenerationMode: Int = MODE_DEFAULT,
-        isFullBleed: Boolean = drawFullBleedIcons,
-    ): Bitmap {
-        val size = iconBitmapSize
-        val bitmap =
-            when (bitmapGenerationMode) {
-                MODE_ALPHA -> Bitmap.createBitmap(size, size, ALPHA_8)
-                MODE_HARDWARE,
-                MODE_HARDWARE_WITH_SHADOW -> {
-                    return BitmapRenderer.createHardwareBitmap(size, size) { canvas: Canvas ->
-                        drawIconBitmap(canvas, icon, scale, bitmapGenerationMode, null, isFullBleed)
-                    }
-                }
+    private fun drawableToBitmap(icon: Drawable, options: IconOptions): Bitmap {
+        val isFullBleedEnabled = options.drawFullBleed ?: drawFullBleedIcons
 
-                MODE_WITH_SHADOW -> Bitmap.createBitmap(size, size, ARGB_8888)
-                else -> Bitmap.createBitmap(size, size, ARGB_8888)
-            }
-        if (icon == null) return bitmap
-        mCanvas.setBitmap(bitmap)
-        drawIconBitmap(mCanvas, icon, scale, bitmapGenerationMode, bitmap, isFullBleed)
-        mCanvas.setBitmap(null)
-        return bitmap
-    }
-
-    private fun drawIconBitmap(
-        canvas: Canvas,
-        icon: Drawable?,
-        scale: Float,
-        @BitmapGenerationMode bitmapGenerationMode: Int,
-        targetBitmap: Bitmap?,
-        isFullBleed: Boolean,
-    ) {
-        val size = iconBitmapSize
-        mOldBounds.set(icon?.bounds ?: return)
-        val isFullBleedEnabled = isFullBleed && Flags.enableLauncherIconShapes()
         if (icon is AdaptiveIconDrawable) {
             // We are ignoring KEY_SHADOW_DISTANCE because regular icons ignore this at the
             // moment b/298203449
             val offset =
                 if (isFullBleedEnabled) 0
-                else max((ceil(BLUR_FACTOR * size)).toInt(), Math.round(size * (1 - scale) / 2))
+                else
+                    max(
+                        (ceil(BLUR_FACTOR * iconBitmapSize)).toInt(),
+                        Math.round(iconBitmapSize * (1 - options.iconScale) / 2),
+                    )
             // b/211896569: AdaptiveIconDrawable do not work properly for non top-left bounds
-            val newBounds = size - offset * 2
+            val newBounds = iconBitmapSize - offset * 2
             icon.setBounds(0, 0, newBounds, newBounds)
-            canvas.transformed {
-                translate(offset.toFloat(), offset.toFloat())
-                if (
-                    (bitmapGenerationMode == MODE_WITH_SHADOW ||
-                        bitmapGenerationMode == MODE_HARDWARE_WITH_SHADOW) && !isFullBleedEnabled
-                ) {
-                    shadowGenerator.addPathShadow(icon.iconMask, canvas)
+            return createBitmap(options) { canvas, _ ->
+                canvas.transformed {
+                    translate(offset.toFloat(), offset.toFloat())
+                    if (options.addShadows && !isFullBleedEnabled)
+                        shadowGenerator.addPathShadow(icon.iconMask, canvas)
+                    if (icon is Extender) icon.drawForPersistence()
+
+                    if (isFullBleedEnabled) {
+                        drawColor(Color.BLACK)
+                        icon.background?.draw(canvas)
+                        icon.foreground?.draw(canvas)
+                    } else {
+                        icon.draw(canvas)
+                    }
                 }
-                if (icon is Extender) {
-                    icon.drawForPersistence()
-                }
-                drawAdaptiveIcon(canvas, icon, isFullBleedEnabled)
             }
         } else {
             if (icon is BitmapDrawable && icon.bitmap?.density == Bitmap.DENSITY_NONE) {
-                icon.setTargetDensity(mContext.resources.displayMetrics)
+                icon.setTargetDensity(context.resources.displayMetrics)
             }
-            var width = size
-            var height = size
+            val iconToDraw =
+                if (icon.intrinsicWidth != icon.intrinsicHeight || options.iconScale != 1f)
+                    icon.wrapIntoSquareDrawable(options.iconScale)
+                else icon
+            iconToDraw.setBounds(0, 0, iconBitmapSize, iconBitmapSize)
 
-            val intrinsicWidth = icon.intrinsicWidth
-            val intrinsicHeight = icon.intrinsicHeight
-            if (intrinsicWidth > 0 && intrinsicHeight > 0) {
-                // Scale the icon proportionally to the icon dimensions
-                val ratio = intrinsicWidth.toFloat() / intrinsicHeight
-                if (intrinsicWidth > intrinsicHeight) {
-                    height = (width / ratio).toInt()
-                } else if (intrinsicHeight > intrinsicWidth) {
-                    width = (height * ratio).toInt()
-                }
-            }
-            val left = (size - width) / 2
-            val top = (size - height) / 2
-            icon.setBounds(left, top, left + width, top + height)
+            return createBitmap(options) { canvas, bitmap ->
+                iconToDraw.draw(canvas)
 
-            canvas.transformed {
-                scale(scale, scale, (size / 2).toFloat(), (size / 2).toFloat())
-                icon.draw(canvas)
-            }
+                if (options.addShadows && bitmap != null) {
+                    // Shadow extraction only works in software mode
+                    shadowGenerator.drawShadow(bitmap, canvas)
 
-            if (bitmapGenerationMode == MODE_WITH_SHADOW && targetBitmap != null) {
-                // Shadow extraction only works in software mode
-                shadowGenerator.drawShadow(targetBitmap, canvas)
-
-                // Draw the icon again on top:
-                canvas.transformed {
-                    scale(scale, scale, (size / 2).toFloat(), (size / 2).toFloat())
-                    icon.draw(canvas)
+                    // Draw the icon again on top
+                    iconToDraw.draw(canvas)
                 }
             }
         }
-        icon.bounds = mOldBounds
     }
 
-    /**
-     * Draws AdaptiveIconDrawable onto canvas with either default shape, or as Full-bleed.
-     *
-     * @param canvas canvas to draw on
-     * @param drawable AdaptiveIconDrawable to draw
-     * @param isFullBleed whether to draw as full-bleed.
-     */
-    private fun drawAdaptiveIcon(
-        canvas: Canvas,
-        drawable: AdaptiveIconDrawable,
-        isFullBleed: Boolean,
-    ) {
-        val background = drawable.background
-        val foreground = drawable.foreground
-        val shouldNotDrawFullBleed = !isFullBleed || (background == null && foreground == null)
-        if (shouldNotDrawFullBleed) {
-            drawable.draw(canvas)
-            return
+    private fun createBitmap(options: IconOptions, block: (Canvas, Bitmap?) -> Unit): Bitmap {
+        if (options.useHardware) {
+            return BitmapRenderer.createHardwareBitmap(iconBitmapSize, iconBitmapSize) {
+                block.invoke(it, null)
+            }
         }
-        canvas.drawColor(Color.BLACK)
-        background?.draw(canvas)
-        foreground?.draw(canvas)
+
+        val result = Bitmap.createBitmap(iconBitmapSize, iconBitmapSize, ARGB_8888)
+        block.invoke(Canvas(result), result)
+        return result
     }
 
     override fun close() = clear()
@@ -404,56 +357,74 @@ constructor(
     }
 
     class IconOptions {
-        var mIsInstantApp: Boolean = false
+        internal var isInstantApp: Boolean = false
+        internal var isFullBleed: Boolean = false
 
-        var mIsFullBleed: Boolean = false
+        internal var userHandle: UserHandle? = null
+        internal var userIconInfo: UserIconInfo? = null
+        @ColorInt internal var extractedColor: Int? = null
+        internal var sourceHint: SourceHint? = null
+        internal var wrapperBackgroundColor = DEFAULT_WRAPPER_BACKGROUND
 
-        @BitmapGenerationMode var mGenerationMode: Int = MODE_WITH_SHADOW
-
-        var mUserHandle: UserHandle? = null
-        var mUserIconInfo: UserIconInfo? = null
-
-        @ColorInt var mExtractedColor: Int? = null
-
-        var mSourceHint: SourceHint? = null
-
-        var mWrapperBackgroundColor = DEFAULT_WRAPPER_BACKGROUND
-
-        /** User for this icon, in case of badging */
-        fun setUser(user: UserHandle?) = apply { mUserHandle = user }
+        internal var useHardware = false
+        internal var addShadows = true
+        internal var drawFullBleed: Boolean? = null
+        internal var iconScale = ICON_VISIBLE_AREA_FACTOR
+        internal var wrapNonAdaptiveIcon = true
 
         /** User for this icon, in case of badging */
-        fun setUser(user: UserIconInfo?) = apply { mUserIconInfo = user }
+        fun setUser(user: UserHandle?) = apply { userHandle = user }
+
+        /** User for this icon, in case of badging */
+        fun setUser(user: UserIconInfo?) = apply { userIconInfo = user }
 
         /** If this icon represents an instant app */
-        fun setInstantApp(instantApp: Boolean) = apply { mIsInstantApp = instantApp }
+        fun setInstantApp(instantApp: Boolean) = apply { isInstantApp = instantApp }
 
         /**
          * If the icon is [BitmapDrawable], assumes that it is a full bleed icon and tries to shape
          * it accordingly
          */
-        fun assumeFullBleedIcon(isFullBleed: Boolean) = apply { mIsFullBleed = isFullBleed }
+        fun assumeFullBleedIcon(isFullBleed: Boolean) = apply { this.isFullBleed = isFullBleed }
 
         /** Disables auto color extraction and overrides the color to the provided value */
-        fun setExtractedColor(@ColorInt color: Int) = apply { mExtractedColor = color }
+        fun setExtractedColor(@ColorInt color: Int) = apply { extractedColor = color }
 
         /**
          * Sets the bitmap generation mode to use for the bitmap info. Note that some generation
          * modes do not support color extraction, so consider setting a extracted color manually in
          * those cases.
          */
-        fun setBitmapGenerationMode(@BitmapGenerationMode generationMode: Int) = apply {
-            mGenerationMode = generationMode
-        }
+        fun setBitmapGenerationMode(@BitmapGenerationMode generationMode: Int) =
+            setUseHardware((generationMode and MODE_HARDWARE) != 0)
+                .setAddShadows((generationMode and MODE_WITH_SHADOW) != 0)
 
         /** User for this icon, in case of badging */
-        fun setSourceHint(sourceHint: SourceHint?) = apply { mSourceHint = sourceHint }
+        fun setSourceHint(sourceHint: SourceHint?) = apply { this.sourceHint = sourceHint }
 
         /** Sets the background color used for wrapped adaptive icon */
         fun setWrapperBackgroundColor(color: Int) = apply {
-            mWrapperBackgroundColor =
+            wrapperBackgroundColor =
                 if (Color.alpha(color) < 255) DEFAULT_WRAPPER_BACKGROUND else color
         }
+
+        /** Sets if hardware bitmap should be generated as the output */
+        fun setUseHardware(hardware: Boolean) = apply { useHardware = hardware }
+
+        /** Sets if shadows should be added as part of BitmapInfo generation */
+        fun setAddShadows(shadows: Boolean) = apply { addShadows = shadows }
+
+        /**
+         * Sets if the bitmap info should be drawn full-bleed or not. Defaults to the IconFactory
+         * constructor parameter.
+         */
+        fun setDrawFullBleed(fullBleed: Boolean) = apply { drawFullBleed = fullBleed }
+
+        /** Sets how much tos cale down the icon when creating the bitmap */
+        fun setIconScale(scale: Float) = apply { iconScale = scale }
+
+        /** Sets if a non-adaptive icon should be wrapped into an adaptive icon or not */
+        fun setWrapNonAdaptiveIcon(wrap: Boolean) = apply { wrapNonAdaptiveIcon = wrap }
     }
 
     private class NoopDrawable : ColorDrawable() {
@@ -480,21 +451,22 @@ constructor(
         }
     }
 
-    private class WrappedAdaptiveIcon(
-        backgroundDrawable: Drawable?,
-        foregroundDrawable: Drawable?,
-    ) : AdaptiveIconDrawable(backgroundDrawable, foregroundDrawable)
-
     companion object {
         private const val DEFAULT_WRAPPER_BACKGROUND = Color.WHITE
         private val LEGACY_ICON_SCALE =
             .7f * (1f / (1 + 2 * AdaptiveIconDrawable.getExtraInsetFraction()))
 
         const val MODE_DEFAULT: Int = 0
-        const val MODE_ALPHA: Int = 1
-        const val MODE_WITH_SHADOW: Int = 2
-        const val MODE_HARDWARE: Int = 3
-        const val MODE_HARDWARE_WITH_SHADOW: Int = 4
+        const val MODE_WITH_SHADOW: Int = 1
+        const val MODE_HARDWARE: Int = 1 shl 1
+        const val MODE_HARDWARE_WITH_SHADOW: Int = MODE_HARDWARE or MODE_WITH_SHADOW
+
+        @Retention(SOURCE)
+        @IntDef(
+            value = [MODE_DEFAULT, MODE_WITH_SHADOW, MODE_HARDWARE_WITH_SHADOW, MODE_HARDWARE],
+            flag = true,
+        )
+        annotation class BitmapGenerationMode
 
         private const val ICON_BADGE_SCALE = 0.444f
 
