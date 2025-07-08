@@ -18,23 +18,54 @@ package com.android.launcher3.icons
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Paint.ANTI_ALIAS_FLAG
 import android.graphics.Path
+import com.android.launcher3.icons.BitmapRenderer.createSoftwareBitmap
 
-interface ShapeRenderer {
+sealed interface ShapeRenderer {
     /**
-     * Draws shape to the canvas using the provided parameters. This is used in draw methods,
-     * so operations should be fast, with no new objects initialized.
-     * @param path path of the icon shape to be drawn.
-     * @param radius Half-width of the shape path to be drawn.
+     * Draws shape to the canvas using the provided parameters. This is used in draw methods, so
+     * operations should be fast, with no new objects initialized.
+     *
      * @param canvas Canvas to draw shape on.
      * @param paint Paint to draw on the Canvas with.
      */
-    fun render(path: Path, canvas: Canvas, paint: Paint) =
-        canvas.drawPath(path, paint)
-}
+    fun render(canvas: Canvas, paint: Paint)
 
-object DefaultRenderer: ShapeRenderer {
-    override fun render(path: Path, canvas: Canvas, paint: Paint) {
-        canvas.drawPath(path, paint)
+    /** A renderer which draws a circle of radius [r] */
+    class CircleRenderer(private val r: Float) : ShapeRenderer {
+
+        override fun render(canvas: Canvas, paint: Paint) {
+            canvas.drawCircle(r, r, r, paint)
+        }
+    }
+
+    /** A renderer which draws a rounded rect in [0, 0, [size], [size]] of corner radius [r] */
+    class RoundedRectRenderer(private val size: Float, private val r: Float) : ShapeRenderer {
+        override fun render(canvas: Canvas, paint: Paint) {
+            canvas.drawRoundRect(0f, 0f, size, size, r, r, paint)
+        }
+    }
+
+    /** A renderer which draws the [path] */
+    class PathRenderer(private val path: Path) : ShapeRenderer {
+        override fun render(canvas: Canvas, paint: Paint) {
+            canvas.drawPath(path, paint)
+        }
+    }
+
+    /**
+     * A renderer which draws the a alpha bitmap mask. This is preferred over [PathRenderer] if the
+     * max rendering size is known
+     */
+    class AlphaMaskRenderer(path: Path, size: Int) : ShapeRenderer {
+
+        private val mask =
+            createSoftwareBitmap(size, size) { it.drawPath(path, Paint(ANTI_ALIAS_FLAG)) }
+                .extractAlpha()
+
+        override fun render(canvas: Canvas, paint: Paint) {
+            canvas.drawBitmap(mask, 0f, 0f, paint)
+        }
     }
 }

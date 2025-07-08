@@ -18,7 +18,7 @@
     package="com.android.launcher3.icons.tests">
 
     <instrumentation
-        android:name="android.testing.TestableInstrumentation"
+        android:name="androidx.test.runner.AndroidJUnitRunner"
         android:targetPackage="com.android.launcher3.icons.tests"
         android:label="Tests for iconloaderlib" />
 </manifest>

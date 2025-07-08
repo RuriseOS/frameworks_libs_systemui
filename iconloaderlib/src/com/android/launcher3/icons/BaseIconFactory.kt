@@ -43,6 +43,7 @@ import com.android.launcher3.util.UserIconInfo
 import com.android.launcher3.util.UserIconInfo.TYPE_MAIN
 import com.android.launcher3.util.UserIconInfo.TYPE_WORK
 import com.android.systemui.shared.Flags.extendibleThemeManager
+import java.lang.ref.WeakReference
 import kotlin.annotation.AnnotationRetention.SOURCE
 import kotlin.math.ceil
 import kotlin.math.max
@@ -59,7 +60,6 @@ constructor(
     @JvmField val iconBitmapSize: Int,
     private val drawFullBleedIcons: Boolean = false,
     val themeController: IconThemeController? = null,
-    private val defaultShapeRenderer: ShapeRenderer = DefaultRenderer
 ) : AutoCloseable {
 
     private val cachedUserInfo = SparseArray<UserIconInfo>()
@@ -67,15 +67,8 @@ constructor(
     private val shadowGenerator: ShadowGenerator by lazy { ShadowGenerator(iconBitmapSize) }
 
     /** Default IconShape for when custom shape is not needed */
-    val defaultIconShape: IconShape by lazy {
-        generateIconShape(
-            iconBitmapSize,
-            AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
-                .apply { setBounds(0, 0, iconBitmapSize, iconBitmapSize) }
-                .iconMask,
-            defaultShapeRenderer
-        )
-    }
+    val defaultIconShape: IconShape by
+        lazy(LazyThreadSafetyMode.NONE) { getDefaultIconShape(iconBitmapSize) }
 
     @Suppress("deprecation")
     fun createIconBitmap(iconRes: ShortcutIconResource): BitmapInfo? {
@@ -476,6 +469,27 @@ constructor(
         @JvmStatic
         fun getBadgeSizeForIconSize(iconSize: Int): Int {
             return (ICON_BADGE_SCALE * iconSize).toInt()
+        }
+
+        /** Cache of default icon shape keyed to the path size */
+        private val defaultIconShapeCache = SparseArray<WeakReference<IconShape>>()
+
+        private fun getDefaultIconShape(size: Int): IconShape {
+            synchronized(defaultIconShapeCache) {
+                val cachedShape = defaultIconShapeCache[size]?.get()
+                if (cachedShape != null) return cachedShape
+
+                val generatedShape =
+                    generateIconShape(
+                        size,
+                        AdaptiveIconDrawable(ColorDrawable(Color.BLACK), null)
+                            .apply { setBounds(0, 0, size, size) }
+                            .iconMask,
+                    )
+
+                defaultIconShapeCache[size] = WeakReference(generatedShape)
+                return generatedShape
+            }
         }
     }
 }

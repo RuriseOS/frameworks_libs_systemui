@@ -32,13 +32,14 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Region
-import android.graphics.RegionIterator
 import android.util.Log
 import androidx.annotation.ColorInt
 import androidx.core.graphics.ColorUtils.compositeColors
 import com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
 import com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR
+import com.android.launcher3.icons.ShapeRenderer.AlphaMaskRenderer
+import com.android.launcher3.icons.ShapeRenderer.CircleRenderer
+import com.android.launcher3.icons.ShapeRenderer.RoundedRectRenderer
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import kotlin.math.ceil
@@ -93,17 +94,6 @@ object GraphicsUtils {
      * allocations/copies during the write (4 bytes per pixel).
      */
     @JvmStatic fun getExpectedBitmapSize(bitmap: Bitmap): Int = bitmap.width * bitmap.height * 4
-
-    @JvmStatic
-    fun getArea(r: Region): Int {
-        val itr = RegionIterator(r)
-        var area = 0
-        val tempRect = Rect()
-        while (itr.next(tempRect)) {
-            area += tempRect.width() * tempRect.height()
-        }
-        return area
-    }
 
     /** Utility method to track new bitmap creation */
     @JvmStatic fun noteNewBitmapCreated() = sOnNewBitmapRunnable.run()
@@ -165,11 +155,7 @@ object GraphicsUtils {
      * [size]]
      */
     @JvmStatic
-    fun generateIconShape(
-        size: Int,
-        shapePath: Path,
-        shapeRenderer: ShapeRenderer = DefaultRenderer
-    ): IconShape {
+    fun generateIconShape(size: Int, shapePath: Path): IconShape {
         // Generate shadow layer:
         // Based on adaptive icon drawing in BaseIconFactory
         val offset =
@@ -186,11 +172,19 @@ object GraphicsUtils {
                     ShadowGenerator(size).addPathShadow(drawnPath, canvas)
                 }
             }
+
+        val roundRectEstimation = RoundRectEstimator.estimateRadius(shapePath, size.toFloat())
         return IconShape(
             pathSize = size,
             path = shapePath,
             shadowLayer = shadowLayer,
-            shapeRenderer = shapeRenderer
+            shapeRenderer =
+                when {
+                    roundRectEstimation >= 1f -> CircleRenderer(size.toFloat() / 2)
+                    roundRectEstimation >= 0f ->
+                        RoundedRectRenderer(size.toFloat(), roundRectEstimation * size / 2)
+                    else -> AlphaMaskRenderer(shapePath, size)
+                },
         )
     }
 
