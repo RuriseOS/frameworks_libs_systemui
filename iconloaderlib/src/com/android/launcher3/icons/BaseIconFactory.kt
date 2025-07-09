@@ -178,12 +178,16 @@ constructor(
         }
         if (options.wrapNonAdaptiveIcon) tempIcon = wrapToAdaptiveIcon(tempIcon, options)
 
-        val bitmap = drawableToBitmap(tempIcon, options)
+        val drawFullBleed = options.drawFullBleed ?: drawFullBleedIcons
+        val bitmap = drawableToBitmap(tempIcon, drawFullBleed, options)
         icon.bounds = oldBounds
 
         val color = options.extractedColor ?: findDominantColorByHue(bitmap)
         var flagOp = getBitmapFlagOp(options)
-        if (drawFullBleedIcons) flagOp = flagOp.addFlag(BitmapInfo.FLAG_FULL_BLEED)
+        if (drawFullBleed) {
+            flagOp = flagOp.addFlag(BitmapInfo.FLAG_FULL_BLEED)
+            bitmap.setHasAlpha(false)
+        }
 
         var info =
             BitmapInfo(
@@ -273,14 +277,16 @@ constructor(
                 )
                 .apply { setBounds(0, 0, 1, 1) }
 
-    private fun drawableToBitmap(icon: Drawable, options: IconOptions): Bitmap {
-        val isFullBleedEnabled = options.drawFullBleed ?: drawFullBleedIcons
-
+    private fun drawableToBitmap(
+        icon: Drawable,
+        drawFullBleed: Boolean,
+        options: IconOptions,
+    ): Bitmap {
         if (icon is AdaptiveIconDrawable) {
             // We are ignoring KEY_SHADOW_DISTANCE because regular icons ignore this at the
             // moment b/298203449
             val offset =
-                if (isFullBleedEnabled) 0
+                if (drawFullBleed) 0
                 else
                     max(
                         (ceil(BLUR_FACTOR * iconBitmapSize)).toInt(),
@@ -292,11 +298,11 @@ constructor(
             return createBitmap(options) { canvas, _ ->
                 canvas.transformed {
                     translate(offset.toFloat(), offset.toFloat())
-                    if (options.addShadows && !isFullBleedEnabled)
+                    if (options.addShadows && !drawFullBleed)
                         shadowGenerator.addPathShadow(icon.iconMask, canvas)
                     if (icon is Extender) icon.drawForPersistence()
 
-                    if (isFullBleedEnabled) {
+                    if (drawFullBleed) {
                         drawColor(Color.BLACK)
                         icon.background?.draw(canvas)
                         icon.foreground?.draw(canvas)
@@ -316,9 +322,10 @@ constructor(
             iconToDraw.setBounds(0, 0, iconBitmapSize, iconBitmapSize)
 
             return createBitmap(options) { canvas, bitmap ->
+                if (drawFullBleed) canvas.drawColor(Color.BLACK)
                 iconToDraw.draw(canvas)
 
-                if (options.addShadows && bitmap != null) {
+                if (options.addShadows && bitmap != null && !drawFullBleed) {
                     // Shadow extraction only works in software mode
                     shadowGenerator.drawShadow(bitmap, canvas)
 
