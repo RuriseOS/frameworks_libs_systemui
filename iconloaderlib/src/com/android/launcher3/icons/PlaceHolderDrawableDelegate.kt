@@ -35,14 +35,14 @@ import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
 class PlaceHolderDrawableDelegate(
     info: BitmapInfo,
     private val iconShape: IconShape,
-    private val mPaint: Paint,
+    paint: Paint,
     loadingColor: Int,
 ) : FastBitmapDrawableDelegate {
 
     private val fillColor = ColorUtils.compositeColors(loadingColor, info.color)
 
     init {
-        mPaint.color = fillColor
+        paint.color = fillColor
     }
 
     override fun drawContent(
@@ -53,7 +53,7 @@ class PlaceHolderDrawableDelegate(
         paint: Paint,
     ) {
         canvas.resizeToContentSize(bounds, iconShape.pathSize.toFloat()) {
-            drawPath(iconShape.path, paint)
+            iconShape.shapeRenderer.render(this, paint)
         }
     }
 

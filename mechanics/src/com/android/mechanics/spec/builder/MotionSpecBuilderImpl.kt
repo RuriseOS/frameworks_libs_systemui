@@ -56,13 +56,17 @@ internal class MotionSpecBuilderImpl(
 
     fun build(): MotionSpec {
         if (placedEffects.isEmpty()) {
-            return MotionSpec(directionalMotionSpec(baseMapping), resetSpring = resetSpring)
+            return MotionSpec(
+                directionalMotionSpec(baseMapping),
+                resetSpring = resetSpring,
+                semantics = baseSemantics,
+            )
         }
 
         builders =
             mutableObjectListOf(
-                DirectionalEffectBuilderScopeImpl(defaultSpring, baseSemantics),
-                DirectionalEffectBuilderScopeImpl(defaultSpring, baseSemantics),
+                DirectionalEffectBuilderScopeImpl(defaultSpring),
+                DirectionalEffectBuilderScopeImpl(defaultSpring),
             )
         segmentHandlers = mutableMapOf()
 
@@ -104,6 +108,7 @@ internal class MotionSpecBuilderImpl(
             builders[1].build(),
             resetSpring,
             segmentHandlers.toMap(),
+            semantics = baseSemantics,
         )
     }
 
@@ -452,10 +457,9 @@ internal class MotionSpecBuilderImpl(
     }
 }
 
-private class DirectionalEffectBuilderScopeImpl(
-    defaultSpring: SpringParameters,
-    baseSemantics: List<SemanticValue<*>>,
-) : DirectionalBuilderImpl(defaultSpring, baseSemantics), DirectionalEffectBuilderScope {
+private class DirectionalEffectBuilderScopeImpl(defaultSpring: SpringParameters) :
+    DirectionalBuilderImpl(defaultSpring, baseSemantics = emptyList()),
+    DirectionalEffectBuilderScope {
 
     var beforeGuarantee: Guarantee? = null
     var beforeSpring: SpringParameters? = null

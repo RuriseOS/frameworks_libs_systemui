@@ -307,6 +307,36 @@ class MotionSpecTest {
         assertFailsWith<NoSuchElementException> { underTest.semantics(unknownSegment) }
     }
 
+    @Test
+    fun semantics_atSpecLevel_canBeAssociatedWithSpec() {
+        val underTest = MotionSpec(DirectionalMotionSpec.Empty, semantics = listOf(S1 with "One"))
+
+        assertThat(underTest.semanticState(S1)).isEqualTo("One")
+    }
+
+    @Test
+    fun semantics_atSpecLevel_canBeQueriedViaSegment() {
+        val underTest = MotionSpec(DirectionalMotionSpec.Empty, semantics = listOf(S1 with "One"))
+
+        val maxDirectionSegment = SegmentKey(BMin, BMax, InputDirection.Max)
+        assertThat(underTest.semanticState(S1, maxDirectionSegment)).isEqualTo("One")
+    }
+
+    @Test
+    fun semantics_atSpecLevel_segmentLevelTakesPrecedence() {
+        val underTest =
+            MotionSpec(
+                maxDirection = directionalMotionSpec(semantics = listOf(S1 with "Two")),
+                minDirection = DirectionalMotionSpec.Empty,
+                semantics = listOf(S1 with "One"),
+            )
+
+        assertThat(underTest.semanticState(S1, SegmentKey(BMin, BMax, InputDirection.Max)))
+            .isEqualTo("Two")
+        assertThat(underTest.semanticState(S1, SegmentKey(BMin, BMax, InputDirection.Min)))
+            .isEqualTo("One")
+    }
+
     companion object {
         val BMin = Breakpoint.minLimit.key
         val B1 = BreakpointKey("one")

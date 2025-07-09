@@ -31,12 +31,14 @@ import com.android.mechanics.spring.SpringParameters
  *   caused by setting this new spec.
  * @param segmentHandlers allow for custom segment-change logic, when the `MotionValue` runtime
  *   would leave the [SegmentKey].
+ * @param semantics semantics applied to the complete [MotionSpec]
  */
 data class MotionSpec(
     val maxDirection: DirectionalMotionSpec,
     val minDirection: DirectionalMotionSpec = maxDirection,
     val resetSpring: SpringParameters = DefaultResetSpring,
     val segmentHandlers: Map<SegmentKey, OnChangeSegmentHandler> = emptyMap(),
+    val semantics: List<SemanticValue<*>> = emptyList(),
 ) {
 
     /** The [DirectionalMotionSpec] for the specified [direction]. */
@@ -53,6 +55,16 @@ data class MotionSpec(
     }
 
     /**
+     * The semantic state for [key], as defined for the [MotionSpec].
+     *
+     * Returns `null` if no semantic value with [key] is defined.
+     */
+    fun <T> semanticState(key: SemanticKey<T>): T? {
+        @Suppress("UNCHECKED_CAST")
+        return semantics.fastFirstOrNull { it.key == key }?.value as T?
+    }
+
+    /**
      * The semantic state for [key] at segment with [segmentKey].
      *
      * Returns `null` if no semantic value with [key] is defined. Throws [NoSuchElementException] if
@@ -60,7 +72,8 @@ data class MotionSpec(
      */
     fun <T> semanticState(key: SemanticKey<T>, segmentKey: SegmentKey): T? {
         with(get(segmentKey.direction)) {
-            val semanticValues = semantics.fastFirstOrNull { it.key == key } ?: return null
+            val semanticValues =
+                semantics.fastFirstOrNull { it.key == key } ?: return semanticState(key)
             val segmentIndex = findSegmentIndex(segmentKey)
             if (segmentIndex < 0) throw NoSuchElementException()
 
@@ -154,8 +167,7 @@ data class MotionSpec(
  *   element, and [Breakpoint.maxLimit] as the last element.
  * @param mappings All mappings in between the breakpoints, thus must always contain
  *   `breakpoints.size - 1` elements.
- * @param semantics semantics provided by this spec, must only reference to breakpoint keys included
- *   in [breakpoints].
+ * @param semantics Semantics that apply to the [MotionSpec].
  */
 data class DirectionalMotionSpec(
     val breakpoints: List<Breakpoint>,
