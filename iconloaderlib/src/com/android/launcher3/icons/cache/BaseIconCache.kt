@@ -188,8 +188,15 @@ constructor(
         val index = userFormatString.indexOfKey(key)
         var format: String?
         if (index < 0) {
-            format = packageManager.getUserBadgedLabel(IDENTITY_FORMAT_STRING, user).toString()
-            if (TextUtils.equals(IDENTITY_FORMAT_STRING, format)) {
+            try {
+                format = packageManager.getUserBadgedLabel(IDENTITY_FORMAT_STRING, user).toString()
+                if (TextUtils.equals(IDENTITY_FORMAT_STRING, format)) {
+                    format = null
+                }
+            } catch (e: Exception) {
+                // Its possible that the caller may have an outdated cached user specific-entry.
+                // For eg, if a user was removed but that event has not propagated to the client yet
+                Log.e(TAG, "failed to access private profile data", e)
                 format = null
             }
             userFormatString.put(key, format)
