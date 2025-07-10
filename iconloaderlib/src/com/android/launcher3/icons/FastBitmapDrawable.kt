@@ -28,7 +28,6 @@ import android.graphics.Paint.ANTI_ALIAS_FLAG
 import android.graphics.Paint.FILTER_BITMAP_FLAG
 import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Drawable.Callback
 import android.util.FloatProperty
@@ -41,7 +40,6 @@ import com.android.launcher3.icons.BitmapInfo.Companion.LOW_RES_INFO
 import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.SimpleDelegateFactory
-import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
 import kotlin.math.min
 
 class FastBitmapDrawable
@@ -61,7 +59,6 @@ constructor(
     @JvmField protected val paint: Paint = Paint(FILTER_BITMAP_FLAG or ANTI_ALIAS_FLAG)
 
     val delegate = delegateFactory.newDelegate(bitmapInfo, iconShape, paint, this)
-    private val shader: Shader? = delegate.createPaintShader(bitmapInfo, iconShape)
 
     @JvmField @VisibleForTesting var isPressed: Boolean = false
     @JvmField @VisibleForTesting var isHovered: Boolean = false
@@ -123,22 +120,8 @@ constructor(
     }
 
     private fun drawInternal(canvas: Canvas, bounds: Rect) {
-        delegate.drawContent(bitmapInfo, this, canvas, bounds, paint)
+        delegate.drawContent(bitmapInfo, iconShape, canvas, bounds, paint)
         badge?.draw(canvas)
-    }
-
-    /**
-     * Draws the shader created using [FastBitmapDrawableDelegate.createPaintShader] in the provided
-     * bounds
-     */
-    fun drawShaderInBounds(canvas: Canvas, bounds: Rect) {
-        canvas.drawBitmap(iconShape.shadowLayer, null, bounds, paint)
-
-        canvas.resizeToContentSize(bounds, iconShape.pathSize.toFloat()) {
-            paint.shader = shader
-            iconShape.shapeRenderer.render(canvas, paint)
-            paint.shader = null
-        }
     }
 
     /** Returns the primary icon color, slightly tinted white */

@@ -83,7 +83,7 @@ class ClockThemedBitmap(
             shape,
             animInfo.copy(
                 themeFgColor = colors[1],
-                shaderProvider = { LinearGradient(0f, 0f, 1f, 1f, colors[0], colors[0], CLAMP) },
+                shader = LinearGradient(0f, 0f, 1f, 1f, colors[0], colors[0], CLAMP),
             ),
         )
     }

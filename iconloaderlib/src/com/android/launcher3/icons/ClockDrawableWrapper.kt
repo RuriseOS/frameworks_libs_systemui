@@ -32,6 +32,7 @@ import android.graphics.drawable.LayerDrawable
 import android.os.SystemClock
 import android.util.Log
 import com.android.launcher3.icons.BitmapInfo.Extender
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.Companion.drawShaderInBounds
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.GraphicsUtils.getColorMultipliedFilter
 import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
@@ -66,7 +67,7 @@ private constructor(base: AdaptiveIconDrawable, private val animationInfo: Clock
             delegateFactory =
                 animationInfo.copy(
                     themeFgColor = NO_COLOR,
-                    shaderProvider = { BitmapShader(flattenBG, CLAMP, CLAMP) },
+                    shader = BitmapShader(flattenBG, CLAMP, CLAMP),
                 )
         )
     }
@@ -91,7 +92,7 @@ private constructor(base: AdaptiveIconDrawable, private val animationInfo: Clock
         val defaultSecond: Int,
         val baseDrawableState: ConstantState,
         val themeFgColor: Int = NO_COLOR,
-        val shaderProvider: (IconShape) -> Shader? = { null },
+        val shader: Shader? = null,
     ) : DelegateFactory {
 
         fun applyTime(time: Calendar, foregroundDrawable: LayerDrawable): Boolean {
@@ -150,21 +151,18 @@ private constructor(base: AdaptiveIconDrawable, private val animationInfo: Clock
                     colorFilter = getColorMultipliedFilter(themedFgColor, paint.colorFilter)
                 }
 
-        override fun createPaintShader(bitmapInfo: BitmapInfo, shape: IconShape): Shader? =
-            animInfo.shaderProvider.invoke(shape)
-
         override fun setAlpha(alpha: Int) {
             foreground.alpha = alpha
         }
 
         override fun drawContent(
             info: BitmapInfo,
-            host: FastBitmapDrawable,
+            iconShape: IconShape,
             canvas: Canvas,
             bounds: Rect,
             paint: Paint,
         ) {
-            host.drawShaderInBounds(canvas, bounds)
+            canvas.drawShaderInBounds(bounds, iconShape, paint, animInfo.shader)
 
             // prepare and draw the foreground
             animInfo.applyTime(time, foreground)
