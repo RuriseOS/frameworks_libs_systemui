@@ -16,8 +16,11 @@
 
 package com.android.launcher3.icons;
 
+import static android.graphics.Color.luminance;
 import static android.graphics.Paint.ANTI_ALIAS_FLAG;
 import static android.graphics.Paint.FILTER_BITMAP_FLAG;
+
+import static com.android.systemui.shared.Flags.notificationDotContrastBorder;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -26,9 +29,10 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PathMeasure;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.util.Log;
 import android.view.ViewDebug;
+
+import androidx.core.graphics.ColorUtils;
 
 /**
  * Used to draw a notification dot on top of an icon.
@@ -39,6 +43,8 @@ public class DotRenderer {
 
     // The dot size is defined as a percentage of the app icon size.
     private static final float SIZE_PERCENTAGE = 0.228f;
+    // The black border needs a light notification dot color. This is for accessibility.
+    private static final float LUMINENSCE_LIMIT = .70f;
 
     private final float mCircleRadius;
     private final Paint mCirclePaint = new Paint(ANTI_ALIAS_FLAG | FILTER_BITMAP_FLAG);
@@ -57,7 +63,7 @@ public class DotRenderer {
             size = MIN_DOT_SIZE;
         }
         ShadowGenerator.Builder builder = new ShadowGenerator.Builder(Color.TRANSPARENT);
-        builder.ambientShadowAlpha = 88;
+        builder.ambientShadowAlpha = notificationDotContrastBorder() ? 255 : 88;
         mBackgroundWithShadow = builder.setupBlurForSize(size).createPill(size, size);
         mCircleRadius = builder.radius;
 
@@ -123,8 +129,17 @@ public class DotRenderer {
         canvas.translate(dotCenterX + offsetX, dotCenterY + offsetY);
         canvas.scale(params.scale, params.scale);
 
+        // Draw Background Shadow
         mCirclePaint.setColor(Color.BLACK);
         canvas.drawBitmap(mBackgroundWithShadow, mBitmapOffset, mBitmapOffset, mCirclePaint);
+
+        // Draw Colored Dot - Update dot color to have sufficient accessibility contrast
+        if (notificationDotContrastBorder() && luminance(params.dotColor) < LUMINENSCE_LIMIT) {
+            double[] lab = new double[3];
+            ColorUtils.colorToLAB(params.dotColor, lab);
+            params.dotColor = ColorUtils.LABToColor(100 * LUMINENSCE_LIMIT, lab[1], lab[2]);
+        }
+
         mCirclePaint.setColor(params.dotColor);
         canvas.drawCircle(0, 0, mCircleRadius, mCirclePaint);
         canvas.restore();
