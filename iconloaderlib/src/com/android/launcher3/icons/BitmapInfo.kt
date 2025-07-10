@@ -213,7 +213,7 @@ data class BitmapInfo(
     companion object {
         const val TAG: String = "BitmapInfo"
 
-        // BitmapInfo flags
+        // Persisted BitmapInfo flags. Reset the cache whenever making any changes here.
         const val FLAG_WORK: Int = 1 shl 0
         const val FLAG_INSTANT: Int = 1 shl 1
         const val FLAG_CLONE: Int = 1 shl 2
