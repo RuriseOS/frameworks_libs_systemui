@@ -213,12 +213,15 @@ data class BitmapInfo(
     companion object {
         const val TAG: String = "BitmapInfo"
 
-        // Persisted BitmapInfo flags. Reset the cache whenever making any changes here.
+        // Persisted BitmapInfo flags.
+        // Reset the cache by changing RELEASE_VERSION whenever making any changes here.
+        // LINT.IfChange
         const val FLAG_WORK: Int = 1 shl 0
         const val FLAG_INSTANT: Int = 1 shl 1
         const val FLAG_CLONE: Int = 1 shl 2
         const val FLAG_PRIVATE: Int = 1 shl 3
         const val FLAG_FULL_BLEED: Int = 1 shl 4
+        // LINT.ThenChange(src/com/android/launcher3/icons/cache/BaseIconCache.kt:cache_release_version)
 
         // Drawable creation flags
         const val FLAG_THEMED: Int = 1 shl 0
