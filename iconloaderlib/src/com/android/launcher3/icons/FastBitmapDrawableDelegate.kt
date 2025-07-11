@@ -26,6 +26,7 @@ import android.graphics.Shader
 import android.graphics.Shader.TileMode.CLAMP
 import androidx.core.graphics.ColorUtils
 import com.android.launcher3.icons.BitmapInfo.Companion.FLAG_FULL_BLEED
+import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
 
 /** A delegate for changing the rendering of [FastBitmapDrawable], to support multi-inheritance */
 interface FastBitmapDrawableDelegate {
@@ -36,17 +37,11 @@ interface FastBitmapDrawableDelegate {
     /** [android.graphics.drawable.Drawable.draw] */
     fun drawContent(
         info: BitmapInfo,
-        host: FastBitmapDrawable,
+        iconShape: IconShape,
         canvas: Canvas,
         bounds: Rect,
         paint: Paint,
-    ) {
-        if ((info.flags and FLAG_FULL_BLEED) != 0) {
-            host.drawShaderInBounds(canvas, bounds)
-        } else {
-            canvas.drawBitmap(info.icon, null, bounds, paint)
-        }
-    }
+    )
 
     /** [FastBitmapDrawable.getIconColor] */
     fun getIconColor(info: BitmapInfo): Int =
@@ -70,15 +65,6 @@ interface FastBitmapDrawableDelegate {
     /** [android.graphics.drawable.Drawable.onLevelChange] */
     fun onLevelChange(level: Int): Boolean = false
 
-    /** Creates a default shader to be used for drawing the drawable */
-    fun createPaintShader(bitmapInfo: BitmapInfo, shape: IconShape): Shader? {
-        return if ((bitmapInfo.flags and FLAG_FULL_BLEED) != 0) {
-            BitmapShader(bitmapInfo.icon, CLAMP, CLAMP)
-        } else {
-            null
-        }
-    }
-
     /**
      * Interface for creating new delegates. This should not store any state information and can
      * safely be stored in a [android.graphics.drawable.Drawable.ConstantState]
@@ -93,12 +79,62 @@ interface FastBitmapDrawableDelegate {
         ): FastBitmapDrawableDelegate
     }
 
+    class FullBleedDrawableDelegate(bitmapInfo: BitmapInfo) : FastBitmapDrawableDelegate {
+        private val shader = BitmapShader(bitmapInfo.icon, CLAMP, CLAMP)
+
+        override fun drawContent(
+            info: BitmapInfo,
+            iconShape: IconShape,
+            canvas: Canvas,
+            bounds: Rect,
+            paint: Paint,
+        ) {
+            canvas.drawShaderInBounds(bounds, iconShape, paint, shader)
+        }
+    }
+
+    object SimpleDrawableDelegate : FastBitmapDrawableDelegate {
+
+        override fun drawContent(
+            info: BitmapInfo,
+            iconShape: IconShape,
+            canvas: Canvas,
+            bounds: Rect,
+            paint: Paint,
+        ) {
+            canvas.drawBitmap(info.icon, null, bounds, paint)
+        }
+    }
+
     object SimpleDelegateFactory : DelegateFactory {
         override fun newDelegate(
             bitmapInfo: BitmapInfo,
             iconShape: IconShape,
             paint: Paint,
             host: FastBitmapDrawable,
-        ) = object : FastBitmapDrawableDelegate {}
+        ) =
+            if ((bitmapInfo.flags and FLAG_FULL_BLEED) != 0) FullBleedDrawableDelegate(bitmapInfo)
+            else SimpleDrawableDelegate
+    }
+
+    companion object {
+
+        /**
+         * Draws the shader created using [FastBitmapDrawableDelegate.createPaintShader] in the
+         * provided bounds
+         */
+        fun Canvas.drawShaderInBounds(
+            bounds: Rect,
+            iconShape: IconShape,
+            paint: Paint,
+            shader: Shader?,
+        ) {
+            drawBitmap(iconShape.shadowLayer, null, bounds, paint)
+            resizeToContentSize(bounds, iconShape.pathSize.toFloat()) {
+                paint.shader = shader
+                iconShape.shapeRenderer.render(this, paint)
+                paint.shader = null
+            }
+        }
     }
 }

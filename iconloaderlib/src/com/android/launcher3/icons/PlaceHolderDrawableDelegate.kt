@@ -32,12 +32,8 @@ import com.android.launcher3.icons.GraphicsUtils.getAttrColor
 import com.android.launcher3.icons.GraphicsUtils.resizeToContentSize
 
 /** Subclass which draws a placeholder icon when the actual icon is not yet loaded */
-class PlaceHolderDrawableDelegate(
-    info: BitmapInfo,
-    private val iconShape: IconShape,
-    paint: Paint,
-    loadingColor: Int,
-) : FastBitmapDrawableDelegate {
+class PlaceHolderDrawableDelegate(info: BitmapInfo, paint: Paint, loadingColor: Int) :
+    FastBitmapDrawableDelegate {
 
     private val fillColor = ColorUtils.compositeColors(loadingColor, info.color)
 
@@ -47,7 +43,7 @@ class PlaceHolderDrawableDelegate(
 
     override fun drawContent(
         info: BitmapInfo,
-        host: FastBitmapDrawable,
+        iconShape: IconShape,
         canvas: Canvas,
         bounds: Rect,
         paint: Paint,
@@ -92,7 +88,7 @@ class PlaceHolderDrawableDelegate(
             paint: Paint,
             host: FastBitmapDrawable,
         ): FastBitmapDrawableDelegate {
-            return PlaceHolderDrawableDelegate(bitmapInfo, iconShape, paint, loadingColor)
+            return PlaceHolderDrawableDelegate(bitmapInfo, paint, loadingColor)
         }
     }
 }
