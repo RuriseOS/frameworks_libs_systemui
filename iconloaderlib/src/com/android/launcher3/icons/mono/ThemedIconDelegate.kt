@@ -21,7 +21,6 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
-import android.graphics.Shader
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
 import com.android.launcher3.icons.FastBitmapDrawableDelegate
@@ -34,7 +33,7 @@ import com.android.launcher3.icons.R
 /** Drawing delegate handle monochrome themed app icons */
 class ThemedIconDelegate(
     constantState: ThemedIconInfo,
-    val iconShape: IconShape,
+    val bitmapInfo: BitmapInfo,
     val paint: Paint,
 ) : FastBitmapDrawableDelegate {
 
@@ -47,17 +46,15 @@ class ThemedIconDelegate(
             colorFilter = getColorMultipliedFilter(colorFg, paint.colorFilter)
         }
 
-    private val shapeBounds = Rect(0, 0, iconShape.pathSize, iconShape.pathSize)
+    private val shapeBounds = Rect(0, 0, bitmapInfo.icon.width, bitmapInfo.icon.height)
 
     init {
         paint.color = constantState.colorBg
     }
 
-    override fun createPaintShader(bitmapInfo: BitmapInfo, shape: IconShape): Shader? = null
-
     override fun drawContent(
         info: BitmapInfo,
-        host: FastBitmapDrawable,
+        iconShape: IconShape,
         canvas: Canvas,
         bounds: Rect,
         paint: Paint,
@@ -106,5 +103,5 @@ class ThemedIconInfo(val mono: Bitmap, val colorBg: Int, val colorFg: Int) : Del
         iconShape: IconShape,
         paint: Paint,
         host: FastBitmapDrawable,
-    ) = ThemedIconDelegate(this, iconShape, paint)
+    ) = ThemedIconDelegate(this, bitmapInfo, paint)
 }
