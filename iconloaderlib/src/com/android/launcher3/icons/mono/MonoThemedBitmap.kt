@@ -24,8 +24,7 @@ import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.ClockDrawableWrapper.ClockAnimationInfo
-import com.android.launcher3.icons.FastBitmapDrawable
-import com.android.launcher3.icons.IconShape
+import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.LuminanceComputer
 import com.android.launcher3.icons.ThemedBitmap
 import java.nio.ByteBuffer
@@ -36,14 +35,8 @@ class MonoThemedBitmap(
     @get:VisibleForTesting val luminanceDelta: Double? = null,
 ) : ThemedBitmap {
 
-    override fun newDrawable(
-        info: BitmapInfo,
-        context: Context,
-        shape: IconShape,
-    ): FastBitmapDrawable {
-        val colors = getUpdatedColors(context)
-        return FastBitmapDrawable(info, shape, ThemedIconInfo(mono, colors[0], colors[1]))
-    }
+    override fun newDelegateFactory(info: BitmapInfo, context: Context): DelegateFactory =
+        getUpdatedColors(context).let { ThemedIconInfo(mono, it[0], it[1]) }
 
     override fun serialize(): ByteArray {
         val expectedSize = mono.width * mono.height
@@ -72,21 +65,13 @@ class ClockThemedBitmap(
     private val colorProvider: (Context) -> IntArray = ThemedIconDelegate.Companion::getColors,
 ) : ThemedBitmap {
 
-    override fun newDrawable(
-        info: BitmapInfo,
-        context: Context,
-        shape: IconShape,
-    ): FastBitmapDrawable {
-        val colors = colorProvider(context)
-        return FastBitmapDrawable(
-            info,
-            shape,
+    override fun newDelegateFactory(info: BitmapInfo, context: Context): DelegateFactory =
+        colorProvider(context).let { colors ->
             animInfo.copy(
                 themeFgColor = colors[1],
                 shader = LinearGradient(0f, 0f, 1f, 1f, colors[0], colors[0], CLAMP),
-            ),
-        )
-    }
+            )
+        }
 
     override fun serialize() = byteArrayOf()
 }
