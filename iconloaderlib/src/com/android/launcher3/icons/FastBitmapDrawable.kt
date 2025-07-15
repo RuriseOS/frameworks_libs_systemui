@@ -19,7 +19,6 @@ import android.R
 import android.animation.ObjectAnimator
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -40,7 +39,6 @@ import com.android.launcher3.icons.BitmapInfo.Companion.LOW_RES_INFO
 import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.SimpleDelegateFactory
-import kotlin.math.min
 
 class FastBitmapDrawable
 @JvmOverloads
@@ -48,6 +46,9 @@ constructor(
     info: BitmapInfo?,
     private val iconShape: IconShape = IconShape.EMPTY,
     private val delegateFactory: DelegateFactory = SimpleDelegateFactory,
+    @JvmField @DrawableCreationFlags val creationFlags: Int = 0,
+    private val disabledAlpha: Float = 1f,
+    val badge: Drawable? = null,
 ) : Drawable(), Callback {
 
     @JvmOverloads constructor(b: Bitmap, iconColor: Int = 0) : this(BitmapInfo.of(b, iconColor))
@@ -63,8 +64,6 @@ constructor(
     @JvmField @VisibleForTesting var isPressed: Boolean = false
     @JvmField @VisibleForTesting var isHovered: Boolean = false
 
-    @JvmField var disabledAlpha: Float = 1f
-
     var isDisabled: Boolean = false
         set(value) {
             if (field != value) {
@@ -74,7 +73,6 @@ constructor(
             }
         }
 
-    @JvmField @DrawableCreationFlags var creationFlags: Int = 0
     @JvmField @VisibleForTesting var scaleAnimation: ObjectAnimator? = null
     var hoverScaleEnabledForDisplay = true
 
@@ -84,19 +82,8 @@ constructor(
     private var paintFilter: ColorFilter? = null
 
     init {
-        isFilterBitmap = true
+        badge?.callback = this
     }
-
-    var badge: Drawable? = null
-        set(value) {
-            field?.callback = null
-            field = value
-            field?.let {
-                it.callback = this
-                it.setBadgeBounds(bounds)
-            }
-            updateFilter()
-        }
 
     /** Returns true if the drawable points to the same bitmap icon object */
     fun isSameInfo(info: BitmapInfo): Boolean = bitmapInfo === info
@@ -255,6 +242,7 @@ constructor(
             badge?.constantState,
             iconShape,
             creationFlags,
+            disabledAlpha,
             delegateFactory,
             level,
         )
@@ -284,20 +272,24 @@ constructor(
         val badgeConstantState: ConstantState?,
         val iconShape: IconShape,
         val creationFlags: Int,
+        val disabledAlpha: Float,
         val delegateFactory: DelegateFactory,
         val level: Int,
     ) : ConstantState() {
 
-        override fun newDrawable(): FastBitmapDrawable {
-            val drawable = FastBitmapDrawable(bitmapInfo, iconShape, delegateFactory)
-            drawable.isDisabled = isDisabled
-            if (badgeConstantState != null) {
-                drawable.badge = badgeConstantState.newDrawable()
-            }
-            drawable.creationFlags = creationFlags
-            drawable.level = level
-            return drawable
-        }
+        override fun newDrawable() =
+            FastBitmapDrawable(
+                    info = bitmapInfo,
+                    iconShape = iconShape,
+                    delegateFactory = delegateFactory,
+                    creationFlags = creationFlags,
+                    badge = badgeConstantState?.newDrawable(),
+                    disabledAlpha = disabledAlpha,
+                )
+                .apply {
+                    isDisabled = this@FastBitmapConstantState.isDisabled
+                    level = this@FastBitmapConstantState.level
+                }
 
         override fun getChangingConfigurations(): Int = 0
     }
@@ -315,7 +307,6 @@ constructor(
 
         private const val DISABLED_DESATURATION = 1f
         private const val DISABLED_BRIGHTNESS = 0.5f
-        const val FULLY_OPAQUE: Int = 255
 
         const val CLICK_FEEDBACK_DURATION: Int = 200
         const val HOVER_FEEDBACK_DURATION: Int = 300
@@ -354,15 +345,6 @@ constructor(
             mat[18] = disabledAlpha
             tempFilterMatrix.preConcat(tempBrightnessMatrix)
             return ColorMatrixColorFilter(tempFilterMatrix)
-        }
-
-        @JvmStatic
-        fun getDisabledColor(color: Int): Int {
-            val avgComponent = (Color.red(color) + Color.green(color) + Color.blue(color)) / 3
-            val scale = 1 - DISABLED_BRIGHTNESS
-            val brightnessI = (255 * DISABLED_BRIGHTNESS).toInt()
-            val component = min(Math.round(scale * avgComponent + brightnessI), FULLY_OPAQUE)
-            return Color.rgb(component, component, component)
         }
 
         /** Sets the bounds for the badge drawable based on the main icon bounds */
