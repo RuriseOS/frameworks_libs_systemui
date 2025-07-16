@@ -73,10 +73,7 @@ public class BubbleIconFactory extends BaseIconFactory {
      * Creates the bitmap for the provided drawable and returns the scale used for
      * drawing the actual drawable. This is used for the larger icon shown for the bubble.
      */
-    public Bitmap getBubbleBitmap(@NonNull Drawable icon, float[] outScale) {
-        if (outScale != null) {
-            outScale[0] = IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
-        }
+    public Bitmap getBubbleBitmap(@NonNull Drawable icon) {
         return createIconBitmap(
                 wrapToAdaptiveIcon(icon),
                 IconNormalizer.ICON_VISIBLE_AREA_FACTOR,
