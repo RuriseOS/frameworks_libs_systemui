@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
  * @param stableThreshold The threshold to determine if the motion value is stable.
  * @param debug Whether this value needs to be registered to a [MotionValueDebugger].
  */
+// TODO(b/410524175) MotionValueNode will be removed in a follow up CL
 internal class MotionValueNode(
     private var input: () -> Float,
     gestureContext: GestureContext,
@@ -59,9 +60,9 @@ internal class MotionValueNode(
 
     private val motionValue =
         MotionValue(
-            currentInput = { currentInputState },
+            input = { currentInputState },
             gestureContext = gestureContext,
-            initialSpec = initialSpec,
+            spec = { initialSpec },
             label = label,
             stableThreshold = stableThreshold,
         )
@@ -119,6 +120,6 @@ internal class MotionValueNode(
     }
 
     fun updateSpec(spec: MotionSpec) {
-        motionValue.spec = spec
+        //   motionValue.spec = spec
     }
 }

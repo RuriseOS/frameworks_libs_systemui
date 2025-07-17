@@ -138,6 +138,12 @@ private class ViewMotionValueTestHarness(
         gestureContext.dragOffset = value
     }
 
+    override var spec: MotionSpec
+        get() = underTest.spec
+        set(value) {
+            underTest.spec = value
+        }
+
     override suspend fun awaitStable() {
         val debugInspectors = buildList { add(underTest.debugInspector()) }
         try {
