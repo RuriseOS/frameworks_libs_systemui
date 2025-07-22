@@ -80,6 +80,20 @@ interface PerDisplayInstanceProviderWithTeardown<T> : PerDisplayInstanceProvider
 }
 
 /**
+ * Extends [PerDisplayInstanceProvider], adding support for setting up an instance after it's
+ * created.
+ *
+ * This is useful to run custom setup after an instance of the repository is created and cached. Why
+ * not doing it in the [createInstance] itself? if some deps of the setup code tries to get the
+ * instance again through the repository, it would cause a recursive loop (as it will try to create
+ * a new instance). Splitting this into another method helps avoiding the recursion.
+ */
+interface PerDisplayInstanceProviderWithSetup<T> : PerDisplayInstanceProvider<T> {
+    /** Sets up a previously created instance of `T`. */
+    fun setupInstance(instance: T)
+}
+
+/**
  * Provides access to per-display instances of type `T`.
  *
  * Acts as a repository, managing the caching and retrieval of instances created by a
@@ -225,18 +239,41 @@ constructor(
             return null
         }
 
-        // If it doesn't exist, create it and put it in the map.
-        return perDisplayInstances.computeIfAbsent(displayId) { key ->
-            Log.d(TAG, "<$debugName> creating instance for displayId=$key, as it wasn't available.")
+        // Let's not let this method return the new instance until the possible setup for it was
+        // executed.
+        // There is no need to synchronize the other accesses to the map as it's already a
+        // concurrent one.
+        return synchronized(this) {
+            var newlyCreated = false
+            // If it doesn't exist, create it and put it in the map.
             val instance =
-                traceSection({ "creating instance of $debugName for displayId=$key" }) {
-                    instanceProvider.createInstance(key)
+                perDisplayInstances.computeIfAbsent(displayId) { key ->
+                    Log.d(
+                        TAG,
+                        "<$debugName> creating instance for displayId=$key, as it wasn't available.",
+                    )
+                    val instance =
+                        traceSection({ "creating instance of $debugName for displayId=$key" }) {
+                            instanceProvider.createInstance(key)
+                        }
+                    if (instance == null) {
+                        Log.e(
+                            TAG,
+                            "<$debugName> returning null because createInstance($key) returned null.",
+                        )
+                    }
+                    newlyCreated = true
+                    instance
                 }
-            if (instance == null) {
-                Log.e(
-                    TAG,
-                    "<$debugName> returning null because createInstance($key) returned null.",
-                )
+
+            if (
+                newlyCreated &&
+                    instance != null &&
+                    instanceProvider is PerDisplayInstanceProviderWithSetup
+            ) {
+                traceSection({ "setting up instance of $debugName for displayId=$displayId" }) {
+                    instanceProvider.setupInstance(instance)
+                }
             }
             instance
         }
