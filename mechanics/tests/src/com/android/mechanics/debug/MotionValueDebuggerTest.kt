@@ -27,6 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.mechanics.MotionValue
 import com.android.mechanics.ProvidedGestureContext
 import com.android.mechanics.spec.InputDirection
+import com.android.mechanics.spec.MotionSpec
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
@@ -49,7 +50,9 @@ class MotionValueDebuggerTest {
         rule.setContent {
             Box(modifier = Modifier.motionValueDebugger(debuggerState)) {
                 if (hasValue) {
-                    val toDebug = remember { MotionValue(input, gestureContext) }
+                    val toDebug = remember {
+                        MotionValue(input, gestureContext, { MotionSpec.Empty })
+                    }
                     Box(modifier = Modifier.debugMotionValue(toDebug))
                 }
             }
@@ -71,7 +74,9 @@ class MotionValueDebuggerTest {
         rule.setContent {
             Box(modifier = Modifier.motionValueDebugger(debuggerState)) {
                 if (hasValue) {
-                    val toDebug = remember { MotionValue(input, gestureContext) }
+                    val toDebug = remember {
+                        MotionValue(input, gestureContext, { MotionSpec.Empty })
+                    }
                     Box(modifier = Modifier.debugMotionValue(toDebug))
                 }
             }
@@ -87,7 +92,7 @@ class MotionValueDebuggerTest {
     @Test
     fun debugMotionValue_noDebugger_isNoOp() {
         rule.setContent {
-            val toDebug = remember { MotionValue(input, gestureContext) }
+            val toDebug = remember { MotionValue(input, gestureContext, { MotionSpec.Empty }) }
             Box(modifier = Modifier.debugMotionValue(toDebug))
         }
     }

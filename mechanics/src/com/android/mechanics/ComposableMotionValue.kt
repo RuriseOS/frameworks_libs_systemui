@@ -18,62 +18,91 @@ package com.android.mechanics
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import com.android.mechanics.spec.MotionSpec
+import com.android.mechanics.spec.builder.MotionBuilderContext
+import com.android.mechanics.spec.builder.rememberMotionBuilderContext
 
 @Composable
 fun rememberMotionValue(
     input: () -> Float,
-    spec: () -> MotionSpec,
     gestureContext: GestureContext,
-    stableThreshold: Float = 0.01f,
+    spec: () -> MotionSpec,
     label: String? = null,
+    stableThreshold: Float = 0.01f,
 ): MotionValue {
     val motionValue =
         remember(input) {
             MotionValue(
-                input,
-                gestureContext,
-                initialSpec = spec(),
+                input = input,
+                gestureContext = gestureContext,
+                spec = spec,
                 label = label,
                 stableThreshold = stableThreshold,
             )
         }
-
-    val currentSpec = spec()
-    SideEffect {
-        // New spec is intentionally only applied after recomposition.
-        motionValue.spec = currentSpec
-    }
 
     LaunchedEffect(motionValue) { motionValue.keepRunning() }
     return motionValue
 }
 
 @Composable
+fun rememberMotionValue(
+    input: () -> Float,
+    gestureContext: GestureContext,
+    spec: State<MotionSpec>,
+    label: String? = null,
+    stableThreshold: Float = 0.01f,
+): MotionValue {
+    return rememberMotionValue(
+        input = input,
+        gestureContext = gestureContext,
+        spec = spec::value,
+        label = label,
+        stableThreshold = stableThreshold,
+    )
+}
+
+@Composable
 fun rememberDerivedMotionValue(
     input: MotionValue,
-    spec: () -> MotionSpec,
+    specProvider: () -> MotionSpec,
     stableThreshold: Float = 0.01f,
     label: String? = null,
 ): MotionValue {
     val motionValue =
-        remember(input) {
+        remember(input, specProvider) {
             MotionValue.createDerived(
-                input,
-                initialSpec = spec(),
+                source = input,
+                spec = specProvider,
                 label = label,
                 stableThreshold = stableThreshold,
             )
         }
 
-    val currentSpec = spec()
-    SideEffect {
-        // New spec is intentionally only applied after recomposition.
-        motionValue.spec = currentSpec
-    }
-
     LaunchedEffect(motionValue) { motionValue.keepRunning() }
     return motionValue
+}
+
+/**
+ * Efficiently creates and remembers a [MotionSpec], providing it via a stable lambda.
+ *
+ * This function memoizes the [MotionSpec] to avoid expensive recalculations. The spec is
+ * re-computed only when a state dependency within the `spec` lambda changes, not on every
+ * recomposition or each time the output is read.
+ *
+ * @param calculation A lambda with a [MotionBuilderContext] receiver that defines the [MotionSpec].
+ * @return A stable provider `() -> MotionSpec`. Invoking this function is cheap as it returns the
+ *   latest cached value.
+ */
+@Composable
+fun rememberMotionSpecAsState(
+    calculation: MotionBuilderContext.() -> MotionSpec
+): State<MotionSpec> {
+    val updatedSpec = rememberUpdatedState(calculation)
+    val context = rememberMotionBuilderContext()
+    return remember(context) { derivedStateOf { updatedSpec.value(context) } }
 }

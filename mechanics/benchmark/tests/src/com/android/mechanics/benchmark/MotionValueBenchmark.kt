@@ -77,7 +77,7 @@ class MotionValueBenchmark {
     ): TestData {
         val inputState = mutableFloatStateOf(input)
         return TestData(
-            motionValue = MotionValue(inputState::floatValue, gestureContext, spec),
+            motionValue = MotionValue(inputState::floatValue, gestureContext, { spec }),
             gestureContext = gestureContext,
             input = inputState,
             spec = spec,
@@ -91,7 +91,7 @@ class MotionValueBenchmark {
         val gestureContext = DistanceGestureContext(0f, InputDirection.Max, 2f)
         val input = { 0f }
 
-        benchmarkRule.measureRepeated { MotionValue(input, gestureContext) }
+        benchmarkRule.measureRepeated { MotionValue(input, gestureContext, { MotionSpec.Empty }) }
     }
 
     @Test

@@ -323,7 +323,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             var offset = 0f
             repeat(4) {
                 offset -= .2f
-                underTest.spec = generateSpec(offset)
+                spec = generateSpec(offset)
                 awaitFrames()
             }
             awaitStable()
@@ -342,7 +342,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             var offset = 0f
             repeat(4) {
                 offset += .2f
-                underTest.spec = generateSpec(offset)
+                spec = generateSpec(offset)
                 awaitFrames()
             }
             awaitStable()
@@ -486,7 +486,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
 
     @Test
     fun semantics_returnsNullForUnknownKey() {
-        val underTest = MotionValue({ 1f }, FakeGestureContext)
+        val underTest = MotionValue({ 1f }, FakeGestureContext, { MotionSpec.Empty })
 
         val s1 = SemanticKey<String>("Foo")
 
@@ -503,7 +503,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             }
 
         val input = mutableFloatStateOf(0f)
-        val underTest = MotionValue(input::value, FakeGestureContext, spec)
+        val underTest = MotionValue(input::value, FakeGestureContext, { spec })
 
         assertThat(underTest[s1]).isEqualTo("zero")
         input.floatValue = 2f
@@ -519,7 +519,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             }
 
         val input = mutableFloatStateOf(1f)
-        val underTest = MotionValue(input::value, FakeGestureContext, spec)
+        val underTest = MotionValue(input::value, FakeGestureContext, { spec })
 
         assertThat(underTest.segmentKey).isEqualTo(SegmentKey(B1, B2, InputDirection.Max))
         input.floatValue = 2f
@@ -532,7 +532,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         motion.goldenTest(
             spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 0.5f, value = 1f) },
             createDerived = { primary ->
-                listOf(MotionValue.createDerived(primary, MotionSpec.Empty, label = "derived"))
+                listOf(MotionValue.createDerived(primary, { MotionSpec.Empty }, label = "derived"))
             },
             verifyTimeSeries = {
                 // the output of the derived value must match the primary value
@@ -557,8 +557,10 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             createDerived = { primary ->
                 listOf(
                     MotionValue.createDerived(
-                        primary,
-                        specBuilder(Mapping.One) { fixedValue(breakpoint = 0.5f, value = 0f) },
+                        source = primary,
+                        spec = {
+                            specBuilder(Mapping.One) { fixedValue(breakpoint = 0.5f, value = 0f) }
+                        },
                         label = "derived",
                     )
                 )
@@ -601,9 +603,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
             },
         ) {
             animatedInputSequence(0f, 1f)
-            underTest.spec = specBuilder {
-                mapping(breakpoint = 0f) { if (it >= 1f) Float.NaN else 0f }
-            }
+            spec = specBuilder { mapping(breakpoint = 0f) { if (it >= 1f) Float.NaN else 0f } }
 
             awaitFrames()
 
@@ -641,7 +641,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
 
     @Test
     fun keepRunning_concurrentInvocationThrows() = runMonotonicClockTest {
-        val underTest = MotionValue({ 1f }, FakeGestureContext, label = "Foo")
+        val underTest = MotionValue({ 1f }, FakeGestureContext, { MotionSpec.Empty }, label = "Foo")
         val realJob = launch { underTest.keepRunning() }
         testScheduler.runCurrent()
 
@@ -659,7 +659,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
 
     @Test
     fun debugInspector_sameInstance_whileInUse() {
-        val underTest = MotionValue({ 1f }, FakeGestureContext)
+        val underTest = MotionValue({ 1f }, FakeGestureContext, { MotionSpec.Empty })
 
         val originalInspector = underTest.debugInspector()
         assertThat(underTest.debugInspector()).isSameInstanceAs(originalInspector)
@@ -667,7 +667,7 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
 
     @Test
     fun debugInspector_newInstance_afterUnused() {
-        val underTest = MotionValue({ 1f }, FakeGestureContext)
+        val underTest = MotionValue({ 1f }, FakeGestureContext, { MotionSpec.Empty })
 
         val originalInspector = underTest.debugInspector()
         originalInspector.dispose()
