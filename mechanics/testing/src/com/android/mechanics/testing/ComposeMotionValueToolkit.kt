@@ -118,7 +118,7 @@ data object ComposeMotionValueToolkit : MotionValueToolkit<MotionValue, Distance
 private class ComposeMotionValueTestHarness(
     initialInput: Float,
     initialDirection: InputDirection,
-    spec: MotionSpec,
+    override var spec: MotionSpec,
     stableThreshold: Float,
     directionChangeSlop: Float,
     val onFrame: StateFlow<Long>,
@@ -131,10 +131,10 @@ private class ComposeMotionValueTestHarness(
 
     override val underTest =
         MotionValue(
-            { input },
-            gestureContext,
+            input = { input },
+            gestureContext = gestureContext,
+            spec = { spec },
             stableThreshold = stableThreshold,
-            initialSpec = spec,
         )
 
     val derived = createDerived(underTest)

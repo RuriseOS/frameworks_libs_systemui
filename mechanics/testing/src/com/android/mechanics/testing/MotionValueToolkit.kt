@@ -93,6 +93,8 @@ interface InputScope<MotionValueType, GestureContextType> {
     val input: Float
     /** GestureContext created for the `MotionValue` */
     val gestureContext: GestureContextType
+    /** Current spec of the `MotionValue` */
+    var spec: MotionSpec
     /** MotionValue being tested. */
     val underTest: MotionValueType
 
