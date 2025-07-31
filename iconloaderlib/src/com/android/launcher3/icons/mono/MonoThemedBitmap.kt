@@ -22,6 +22,7 @@ import android.graphics.LinearGradient
 import android.graphics.Shader.TileMode.CLAMP
 import android.util.Log
 import androidx.annotation.VisibleForTesting
+import com.android.launcher3.Flags
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.ClockDrawableWrapper.ClockAnimationInfo
 import com.android.launcher3.icons.FastBitmapDrawableDelegate.DelegateFactory
@@ -81,6 +82,11 @@ class ColorAdapter(private val luminanceDelta: Double) {
     private val luminanceComputer = LuminanceComputer.createDefaultLuminanceComputer()
 
     fun adaptedColorProvider(colorProvider: (Context) -> IntArray): (Context) -> IntArray {
+        // if the feature flag is off, then we don't need to adapt the colors at all.
+        if (!Flags.forceMonochromeAppIconsAdaptColors()) {
+            return colorProvider
+        }
+
         // we need to adapt the color provider here, by adapting the foregrund color at
         // index 0, and the background color at index 1.
 
