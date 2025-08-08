@@ -24,6 +24,7 @@ uniform float2 screenSize;
 uniform float cellAspectRatio;
 uniform mat3 transformMatrixBitmap;
 uniform mat3 transformMatrixWeather;
+uniform mat3 transformMatrixAccumulation;
 uniform shader snowFlakeSamples;
 
 #include "shaders/constants.agsl"
@@ -57,6 +58,7 @@ vec4 main(float2 fragCoord) {
     float2 adjustedUv = transformPoint(transformMatrixBitmap, fragCoord);
     // Calculate uv for snow based on transformed coordinates
     float2 weatherUv = transformPoint(transformMatrixWeather, fragCoord);
+    float2 accumulationUv = transformPoint(transformMatrixAccumulation, fragCoord);
     float2 uv = weatherUv / screenSize;
     float2 uvAdjusted = vec2(uv.x, uv.y / screenAspectRatio);
 
@@ -97,7 +99,7 @@ vec4 main(float2 fragCoord) {
     color.rgb = normalBlend(color.rgb, colorForeground.rgb, colorForeground.a);
 
     // 4. Add accumulated snow layer.
-    vec3 accSnow = accumulatedSnow.eval(weatherUv).rgb;
+    vec3 accSnow = accumulatedSnow.eval(accumulationUv).rgb;
     float accSnowMask = smoothstep( (1.-intensity), 1.0, /* mask= */accSnow.r);
     accSnowMask = map(accSnowMask, accSnow.g, 1., 0., 1.);
     accSnowMask = map(accSnowMask, 0., 1., 0., accSnow.b);

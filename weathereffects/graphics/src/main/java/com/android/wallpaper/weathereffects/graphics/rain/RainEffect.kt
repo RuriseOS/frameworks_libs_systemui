@@ -19,6 +19,7 @@ package com.android.wallpaper.weathereffects.graphics.rain
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
@@ -28,6 +29,7 @@ import com.android.wallpaper.weathereffects.graphics.FrameBuffer
 import com.android.wallpaper.weathereffects.graphics.WeatherEffect.Companion.DEFAULT_INTENSITY
 import com.android.wallpaper.weathereffects.graphics.WeatherEffectBase
 import com.android.wallpaper.weathereffects.graphics.utils.GraphicsUtils
+import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.centerCropMatrix
 import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.getScale
 import com.android.wallpaper.weathereffects.graphics.utils.TimeUtils
 import java.util.concurrent.Executor
@@ -40,9 +42,14 @@ class RainEffect(
     background: Bitmap,
     intensity: Float = DEFAULT_INTENSITY,
     /** The initial size of the surface where the effect will be shown. */
-    surfaceSize: SizeF,
+    initialSurfaceSize: SizeF,
     private val mainExecutor: Executor,
-) : WeatherEffectBase(foreground, background, surfaceSize) {
+    initialMatrix: Matrix =
+        centerCropMatrix(
+            initialSurfaceSize,
+            SizeF(background.width.toFloat(), background.height.toFloat()),
+        ),
+) : WeatherEffectBase(foreground, background, initialSurfaceSize, initialMatrix) {
 
     private val rainPaint = Paint().also { it.shader = rainConfig.colorGradingShader }
     // Outline buffer is set with bitmap size, so we need to multiply blur radius by scale to get
@@ -61,9 +68,9 @@ class RainEffect(
 
     init {
         updateTextureUniforms()
-        adjustCropping(surfaceSize)
+        adjustCropping()
         prepareColorGrading()
-        updateGridSize(surfaceSize)
+        updateGridSize(initialSurfaceSize)
         setIntensity(intensity)
     }
 
@@ -90,7 +97,7 @@ class RainEffect(
         outlineBuffer.close()
         outlineBuffer = FrameBuffer(background.width, background.height)
 
-        bitmapScale = getScale(parallaxMatrix)
+        bitmapScale = getScale(positionMatrix.matrix)
         // Different from snow effects, we only need to change blur radius when bitmaps change
         // it only gives the range of rain splashes and doesn't influence the visual effects
         outlineBuffer.setRenderEffect(

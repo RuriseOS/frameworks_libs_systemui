@@ -19,6 +19,7 @@ package com.android.wallpaper.weathereffects.graphics.clouds
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RuntimeShader
 import android.graphics.Shader
@@ -26,6 +27,7 @@ import android.util.SizeF
 import com.android.wallpaper.weathereffects.graphics.WeatherEffect.Companion.DEFAULT_INTENSITY
 import com.android.wallpaper.weathereffects.graphics.WeatherEffectBase
 import com.android.wallpaper.weathereffects.graphics.utils.GraphicsUtils
+import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.centerCropMatrix
 import com.android.wallpaper.weathereffects.graphics.utils.TimeUtils
 import kotlin.math.sin
 
@@ -36,16 +38,21 @@ class CloudsEffect(
     background: Bitmap,
     intensity: Float = DEFAULT_INTENSITY,
     /** The initial size of the surface where the effect will be shown. */
-    surfaceSize: SizeF,
-) : WeatherEffectBase(foreground, background, surfaceSize) {
+    initialSurfaceSize: SizeF,
+    initialMatrix: Matrix =
+        centerCropMatrix(
+            initialSurfaceSize,
+            SizeF(background.width.toFloat(), background.height.toFloat()),
+        ),
+) : WeatherEffectBase(foreground, background, initialSurfaceSize, initialMatrix) {
 
     private val cloudsPaint = Paint().also { it.shader = cloudsConfig.colorGradingShader }
 
     init {
         updateTextureUniforms()
-        adjustCropping(surfaceSize)
+        adjustCropping()
         prepareColorGrading()
-        updateGridSize(surfaceSize)
+        updateGridSize(initialSurfaceSize)
         setIntensity(intensity)
     }
 
