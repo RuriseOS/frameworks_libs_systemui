@@ -69,6 +69,8 @@ constructor(
 
                 override fun onDesktopModeEligibleChanged(displayId: Int) {}
 
+                override fun onDisplayAnimationsDisabledChanged(displayId: Int, enabled: Boolean) {}
+
                 override fun onDisplayAdded(p0: Int) {}
 
                 override fun onDisplayConfigurationChanged(p0: Int, p1: Configuration?) {}
