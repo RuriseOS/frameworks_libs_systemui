@@ -163,10 +163,10 @@ flag {
 }
 
 flag {
-    name: "smartspace_consolidated_weather_layout"
+    name: "smartspace_aqi_updated_design"
     namespace: "systemui"
-    description: "Enable consolidated weather cards in Smartspace"
-    bug: "428972035"
+    description: "Enable updated design for aqi in Smartspace"
+    bug: "435016376"
     metadata {
          purpose: PURPOSE_BUGFIX
     }
