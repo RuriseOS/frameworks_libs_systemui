@@ -23,7 +23,9 @@ import android.graphics.Matrix
 import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.util.SizeF
+import com.android.systemui.shared.Flags.panAndZoomInExtendedWallpaperEffects
 import com.android.wallpaper.weathereffects.graphics.utils.GraphicsUtils
+import com.android.wallpaper.weathereffects.graphics.utils.MatrixAndValues
 import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.calculateTransformDifference
 import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.centerCropMatrix
 import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.getScaleFromMatrixValues
@@ -34,31 +36,25 @@ import kotlin.random.Random
 abstract class WeatherEffectBase(
     protected var foreground: Bitmap,
     protected var background: Bitmap,
-    /** The initial size of the surface where the effect will be shown. */
-    private var surfaceSize: SizeF,
+    /**
+     * Should be screen size with horizontal buffer to support parallax when pan and zoom are
+     * supported.
+     */
+    protected var surfaceSize: SizeF,
+    // TODO(b/435215686): change to Map<Size, Matrix> to support different surfaceSize
+    protected val initialCropMatrix: Matrix,
 ) : WeatherEffect {
-    protected var centerCropMatrix: Matrix =
-        centerCropMatrix(
-            surfaceSize,
-            SizeF(background.width.toFloat(), background.height.toFloat()),
-        )
-        set(value) {
-            field = value
-            value.getValues(centerCropMatrixValues)
-        }
+    protected val cropMatrix = MatrixAndValues(initialCropMatrix)
 
-    protected var parallaxMatrix = Matrix(centerCropMatrix)
-    private val centerCropMatrixValues: FloatArray =
-        FloatArray(9).apply { centerCropMatrix.getValues(this) }
-    private val parallaxMatrixValues: FloatArray =
-        FloatArray(9).apply { parallaxMatrix.getValues(this) }
+    protected val positionMatrix = MatrixAndValues(Matrix(cropMatrix.matrix))
     // Currently, we use same transform for both foreground and background
-    protected open val transformMatrixBitmap: FloatArray = FloatArray(9)
-    protected open val transformMatrixCenterCrop: FloatArray = FloatArray(9)
-    // Apply to weather components not rely on image textures
-    // Should be identity matrix in editor, and only change when parallax applied in homescreen
-    private val transformMatrixWeather: FloatArray = FloatArray(9)
-    protected var bitmapScale = getScaleFromMatrixValues(centerCropMatrixValues)
+    protected open val transformMatrixPosition: FloatArray = FloatArray(9)
+    protected open val transformMatrixCustomCrop: FloatArray = FloatArray(9)
+    // Apply to components not rely on image textures
+    // Should be identity matrix in editor and preview, and only change when parallax applied in
+    // homescreen
+    protected val transformMatrixParallax: FloatArray = FloatArray(9)
+    protected var bitmapScale = getScaleFromMatrixValues(cropMatrix.values)
     protected var elapsedTime: Float = 0f
 
     abstract val shader: RuntimeShader
@@ -66,37 +62,60 @@ abstract class WeatherEffectBase(
     abstract val lut: Bitmap?
     abstract val colorGradingIntensity: Float
 
-    override fun setMatrix(matrix: Matrix) {
-        if (matrix == this.parallaxMatrix) {
+    override fun setCustomCropMatrix(matrix: Matrix) {
+        if (matrix == cropMatrix.matrix) {
             return
         }
+        cropMatrix.set(matrix)
+        adjustCropping()
+    }
 
-        this.parallaxMatrix.setAndUpdateFloatArray(matrix, parallaxMatrixValues)
-        bitmapScale = getScaleFromMatrixValues(parallaxMatrixValues)
-        adjustCropping(surfaceSize)
+    override fun setPositionMatrix(matrix: Matrix) {
+        if (matrix == positionMatrix.matrix) {
+            return
+        }
+        positionMatrix.set(matrix)
+        if (!panAndZoomInExtendedWallpaperEffects()) {
+            // When image is always center aligned, we have scale and translation info in
+            // positionMatrix
+            bitmapScale = getScaleFromMatrixValues(positionMatrix.values)
+        }
+        adjustCropping()
     }
 
     /** This function will be called every time parallax changes, don't do heavy things here */
-    open fun adjustCropping(newSurfaceSize: SizeF) {
-        invertAndTransposeMatrix(parallaxMatrix, transformMatrixBitmap)
-        invertAndTransposeMatrix(centerCropMatrix, transformMatrixCenterCrop)
-        calculateTransformDifference(centerCropMatrix, parallaxMatrix, transformMatrixWeather)
-        shader.setFloatUniform("transformMatrixBitmap", transformMatrixBitmap)
-        shader.setFloatUniform("transformMatrixWeather", transformMatrixWeather)
+    open fun adjustCropping() {
+        invertAndTransposeMatrix(positionMatrix.matrix, transformMatrixPosition)
+        invertAndTransposeMatrix(cropMatrix.matrix, transformMatrixCustomCrop)
+        // the difference includes horizontal translation and wallpaper scale <= 1.1f
+        // In editor and preview, cropMatrix and positionMatrix is the same
+        calculateTransformDifference(
+            cropMatrix.matrix,
+            positionMatrix.matrix,
+            transformMatrixParallax,
+        )
+
+        shader.setFloatUniform("transformMatrixBitmap", transformMatrixPosition)
+        shader.setFloatUniform("transformMatrixWeather", transformMatrixParallax)
     }
 
     open fun updateGridSize(newSurfaceSize: SizeF) {}
 
     override fun resize(newSurfaceSize: SizeF) {
+        if (surfaceSize == newSurfaceSize) {
+            return
+        }
         surfaceSize = newSurfaceSize
-        centerCropMatrix =
+        // TODO(b/435215686): we need to rely on map: surfaceSize -> cropMatrix to update cropMatrix
+        cropMatrix.set(
             centerCropMatrix(
                 surfaceSize,
                 SizeF(background.width.toFloat(), background.height.toFloat()),
             )
+        )
         shader.setFloatUniform("screenSize", newSurfaceSize.width, newSurfaceSize.height)
         shader.setFloatUniform("screenAspectRatio", GraphicsUtils.getAspectRatio(newSurfaceSize))
-        adjustCropping(newSurfaceSize)
+        adjustCropping()
         updateGridSize(newSurfaceSize)
     }
 
@@ -129,13 +148,15 @@ abstract class WeatherEffectBase(
         this.foreground = foreground ?: background
         this.background = background
 
-        centerCropMatrix =
+        // When the user changes bitmap, we should fall back to default center crop matrix
+        cropMatrix.set(
             centerCropMatrix(
                 surfaceSize,
                 SizeF(background.width.toFloat(), background.height.toFloat()),
             )
-        parallaxMatrix.setAndUpdateFloatArray(centerCropMatrix, parallaxMatrixValues)
-        bitmapScale = getScaleFromMatrixValues(centerCropMatrixValues)
+        )
+        positionMatrix.set(cropMatrix.matrix)
+        bitmapScale = getScaleFromMatrixValues(cropMatrix.values)
         shader.setInputBuffer(
             "background",
             BitmapShader(this.background, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
@@ -144,7 +165,7 @@ abstract class WeatherEffectBase(
             "foreground",
             BitmapShader(this.foreground, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
         )
-        adjustCropping(surfaceSize)
+        adjustCropping()
         return true
     }
 

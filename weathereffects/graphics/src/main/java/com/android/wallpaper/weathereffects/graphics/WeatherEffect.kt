@@ -73,11 +73,18 @@ interface WeatherEffect {
     fun setBitmaps(foreground: Bitmap?, background: Bitmap): Boolean
 
     /**
-     * Apply matrix to transform coordinates in shaders. In Editor and preview, it's a center crop
-     * matrix to center the bitmap in surface size; in applied wallpaper, the matrix is the parallax
-     * matrix due to the pagination in homescreen
+     * Applies a transformation matrix for parallax and cropping. In the editor and preview, this
+     * matrix handles custom cropping. When the wallpaper is applied on the home screen, this matrix
+     * combines both custom cropping and parallax-based transformations.
      */
-    fun setMatrix(matrix: Matrix) {}
+    fun setPositionMatrix(matrix: Matrix) {}
+
+    /**
+     * Sets the custom cropping matrix. This is used in the editor and preview to handle
+     * user-defined pan and zoom. The matrix is later incorporated into the parallax matrix for the
+     * final rendering.
+     */
+    fun setCustomCropMatrix(matrix: Matrix) {}
 
     companion object {
         val DEFAULT_INTENSITY = 1f

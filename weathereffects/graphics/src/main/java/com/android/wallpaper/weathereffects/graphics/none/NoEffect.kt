@@ -18,6 +18,7 @@ package com.android.wallpaper.weathereffects.graphics.none
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.util.SizeF
 import com.android.wallpaper.weathereffects.graphics.WeatherEffect
 import com.android.wallpaper.weathereffects.graphics.utils.MatrixUtils
@@ -53,12 +54,6 @@ class NoEffect(
         )
     }
 
-    override fun reset() {}
-
-    override fun release() {}
-
-    override fun setIntensity(intensity: Float) {}
-
     override fun setBitmaps(foreground: Bitmap?, background: Bitmap): Boolean {
         // Only when background changes, we can infer the bitmap set changes
         if (this.background != background) {
@@ -70,4 +65,12 @@ class NoEffect(
         this.foreground = foreground ?: background
         return true
     }
+
+    override fun reset() {}
+
+    override fun release() {}
+
+    override fun setIntensity(intensity: Float) {}
+
+    override fun setCustomCropMatrix(matrix: Matrix) {}
 }
