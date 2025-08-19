@@ -39,17 +39,27 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
     )
 
     // currentComputedValues input
-    private var memoizedSpec: MotionSpec? = null
+    private var memoizedSpec: MotionSpec = MotionSpec.InitiallyUndefined
     private var memoizedInput: Float = Float.MIN_VALUE
     private var memoizedAnimationTimeNanos: Long = Long.MIN_VALUE
     private var memoizedDirection: InputDirection = InputDirection.Min
 
     // currentComputedValues output
-    private lateinit var memoizedComputedValues: ComputedValues
+    private var memoizedComputedValues: ComputedValues =
+        ComputedValues(
+            MotionSpec.InitiallyUndefined.segmentAtInput(memoizedInput, memoizedDirection),
+            GuaranteeState.Inactive,
+            DiscontinuityAnimation.None,
+        )
 
     internal val currentComputedValues: ComputedValues
         get() {
             val currentSpec: MotionSpec = spec
+            if (currentSpec == MotionSpec.InitiallyUndefined) {
+                requireNoMotionSpecSet()
+                return memoizedComputedValues
+            }
+
             val currentInput: Float = currentInput
             val currentAnimationTimeNanos: Long = currentAnimationTimeNanos
             val currentDirection: InputDirection = currentDirection
@@ -63,45 +73,55 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                 return memoizedComputedValues
             }
 
+            val isInitialComputation = memoizedSpec == MotionSpec.InitiallyUndefined
+
             memoizedSpec = currentSpec
             memoizedInput = currentInput
             memoizedAnimationTimeNanos = currentAnimationTimeNanos
             memoizedDirection = currentDirection
 
-            val segment: SegmentData =
-                computeSegmentData(
-                    spec = currentSpec,
-                    input = currentInput,
-                    direction = currentDirection,
-                )
+            memoizedComputedValues =
+                if (isInitialComputation) {
+                    ComputedValues(
+                        currentSpec.segmentAtInput(currentInput, currentDirection),
+                        GuaranteeState.Inactive,
+                        DiscontinuityAnimation.None,
+                    )
+                } else {
+                    val segment: SegmentData =
+                        computeSegmentData(
+                            spec = currentSpec,
+                            input = currentInput,
+                            direction = currentDirection,
+                        )
 
-            val segmentChange: SegmentChangeType =
-                getSegmentChangeType(
-                    segment = segment,
-                    input = currentInput,
-                    direction = currentDirection,
-                )
+                    val segmentChange: SegmentChangeType =
+                        getSegmentChangeType(
+                            segment = segment,
+                            input = currentInput,
+                            direction = currentDirection,
+                        )
 
-            val guarantee: GuaranteeState =
-                computeGuaranteeState(
-                    segment = segment,
-                    segmentChange = segmentChange,
-                    input = currentInput,
-                )
+                    val guarantee: GuaranteeState =
+                        computeGuaranteeState(
+                            segment = segment,
+                            segmentChange = segmentChange,
+                            input = currentInput,
+                        )
 
-            val animation: DiscontinuityAnimation =
-                computeAnimation(
-                    segment = segment,
-                    guarantee = guarantee,
-                    segmentChange = segmentChange,
-                    spec = currentSpec,
-                    input = currentInput,
-                    animationTimeNanos = currentAnimationTimeNanos,
-                )
+                    val animation: DiscontinuityAnimation =
+                        computeAnimation(
+                            segment = segment,
+                            guarantee = guarantee,
+                            segmentChange = segmentChange,
+                            spec = currentSpec,
+                            input = currentInput,
+                            animationTimeNanos = currentAnimationTimeNanos,
+                        )
 
-            return ComputedValues(segment, guarantee, animation).also {
-                memoizedComputedValues = it
-            }
+                    ComputedValues(segment, guarantee, animation)
+                }
+            return memoizedComputedValues
         }
 
     // currentSpringState input
@@ -612,5 +632,35 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                 updatedSpringState
             }
         }
+    }
+
+    /**
+     * Precondition to ensure that this [Computations] has not yet been initialized with a
+     * MotionSpec other than [MotionSpec.InitiallyUndefined].
+     *
+     * This precondition is added since the desired behavior of the MotionValue when toggling back
+     * to a [MotionSpec.InitiallyUndefined] spec is unclear. If there is a compelling usecase, this
+     * restriction could be lifted.
+     */
+    private fun requireNoMotionSpecSet() {
+        // A MotionValue's spec can be MotionValue.Undefined initially. However, once a real spec
+        // has been set, it cannot be changed back to MotionValue.Undefined.
+
+        require(memoizedSpec == MotionSpec.InitiallyUndefined) {
+            // memoizedSpec is only ever Undefined initially, before a motionSpec was set.
+            //  This is used as a signal to detect if a user switches back to Undefined.
+            "MotionSpec must not be changed back to undefined!\n" +
+                " MotionValue: $label\n" +
+                " last MotionSpec: $memoizedSpec"
+        }
+
+        // memoizedComputedValues must not have been reassigned either.
+        require(
+            with(memoizedComputedValues) {
+                segment.spec == MotionSpec.InitiallyUndefined &&
+                    guarantee == GuaranteeState.Inactive &&
+                    animation == DiscontinuityAnimation.None
+            }
+        )
     }
 }
