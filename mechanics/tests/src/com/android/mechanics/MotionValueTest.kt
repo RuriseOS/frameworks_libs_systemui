@@ -50,6 +50,7 @@ import com.android.mechanics.testing.input
 import com.android.mechanics.testing.isStable
 import com.android.mechanics.testing.output
 import com.google.common.truth.Truth.assertThat
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.launch
 import org.junit.Rule
 import org.junit.Test
@@ -83,6 +84,48 @@ class MotionValueTest : MotionBuilderContext by FakeMotionSpecBuilderContext.Def
         ) {
             animateValueTo(100f)
         }
+
+    @Test
+    fun unspecifiedSpec_outputIsNan() =
+        motion.goldenTest(
+            spec = MotionSpec.InitiallyUndefined,
+            verifyTimeSeries = {
+                // This must only produce NaN values
+                output.forEach { assertThat(it).isNaN() }
+                // There must never be an ongoing animation.
+                assertThat(isStable).doesNotContain(false)
+                AssertTimeSeriesMatchesGolden()
+            },
+        ) {
+            animateValueTo(100f)
+        }
+
+    @Test
+    fun unspecifiedSpec_atTheBeginning_jumpcutsToFirstValue() =
+        motion.goldenTest(
+            spec = MotionSpec.InitiallyUndefined,
+            verifyTimeSeries = {
+                // There must never be an ongoing animation.
+                assertThat(isStable).doesNotContain(false)
+
+                AssertTimeSeriesMatchesGolden()
+            },
+        ) {
+            animateValueTo(10f, changePerFrame = 5f)
+            spec = MotionSpec.Empty
+            animateValueTo(20f, changePerFrame = 5f)
+        }
+
+    @Test
+    fun unspecifiedSpec_onAlreadyInitializedValue_throws() {
+        assertFailsWith<IllegalArgumentException> {
+            motion.goldenTest(spec = MotionSpec.Empty) {
+                animateValueTo(10f, changePerFrame = 5f)
+                spec = MotionSpec.InitiallyUndefined
+                animateValueTo(20f, changePerFrame = 5f)
+            }
+        }
+    }
 
     // TODO the tests should describe the expected values not only in terms of goldens, but
     //  also explicitly in verifyTimeSeries

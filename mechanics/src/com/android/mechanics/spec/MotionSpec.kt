@@ -150,6 +150,19 @@ data class MotionSpec(
 
         /* Empty motion spec, the output is the same as the input. */
         val Empty = MotionSpec(DirectionalMotionSpec.Empty)
+
+        /**
+         * Placeholder to indicate that a [MotionSpec] cannot be supplied yet.
+         *
+         * As long as this spec is set, the MotionValue output is NaN. When the MotionValue is first
+         * supplied with an actual spec, the output value will be set immediately, without an
+         * animation.
+         *
+         * This must only ever be supplied as a spec for new `MotionValue`s, which never were
+         * supplied any other spec. Supplying this [InitiallyUndefined] spec to a MotionValue that
+         * has already been supplied a spec will throw an exception.
+         */
+        val InitiallyUndefined = MotionSpec(DirectionalMotionSpec.InitiallyUndefined)
     }
 }
 
@@ -246,6 +259,23 @@ data class DirectionalMotionSpec(
             DirectionalMotionSpec(
                 listOf(Breakpoint.minLimit, Breakpoint.maxLimit),
                 listOf(Mapping.Identity),
+            )
+
+        /** Internal marker for [MotionSpec.InitiallyUndefined]. */
+        internal val InitiallyUndefined =
+            DirectionalMotionSpec(
+                listOf(Breakpoint.minLimit, Breakpoint.maxLimit),
+                listOf(
+                    object : Mapping {
+                        override fun map(input: Float): Float {
+                            return Float.NaN
+                        }
+
+                        override fun toString(): String {
+                            return "InitiallyUndefined"
+                        }
+                    }
+                ),
             )
     }
 }
