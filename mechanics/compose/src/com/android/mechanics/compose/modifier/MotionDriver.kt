@@ -16,7 +16,6 @@
 
 package com.android.mechanics.compose.modifier
 
-import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -30,10 +29,12 @@ import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.TraversableNode
+import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.findNearestAncestor
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Constraints
@@ -43,7 +44,7 @@ import com.android.mechanics.GestureContext
 import com.android.mechanics.MotionValue
 import com.android.mechanics.MotionValue.Companion.StableThresholdEffect
 import com.android.mechanics.compose.modifier.MotionDriver.RequestConstraints
-import com.android.mechanics.debug.findMotionValueDebugger
+import com.android.mechanics.debug.LocalMotionValueDebugController
 import com.android.mechanics.spec.MotionSpec
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.launch
@@ -188,7 +189,11 @@ private data class MotionDriverElement(val gestureContext: GestureContext, val l
 }
 
 private class MotionDriverNode(override var gestureContext: GestureContext) :
-    Modifier.Node(), TraversableNode, LayoutModifierNode, MotionDriver {
+    Modifier.Node(),
+    TraversableNode,
+    LayoutModifierNode,
+    MotionDriver,
+    CompositionLocalConsumerModifierNode {
     private val animatedValues = mutableListOf<AnimatedApproachMeasurementImpl>()
     private var driverCoordinates: LayoutCoordinates? = null
     private var lookAheadHeight: Int = 0
@@ -251,13 +256,10 @@ private class MotionDriverNode(override var gestureContext: GestureContext) :
             )
         animatedValues += animatedApproachMeasurement
 
+        val debugController = if (debug) currentValueOf(LocalMotionValueDebugController) else null
         coroutineScope.launch {
             val disposableHandle =
-                if (debug) {
-                    findMotionValueDebugger()?.register(animatedApproachMeasurement.motionValue)
-                } else {
-                    null
-                }
+                debugController?.register(animatedApproachMeasurement.motionValue)
             try {
                 animatedApproachMeasurement.keepRunningWhileObserved()
             } finally {
@@ -266,7 +268,7 @@ private class MotionDriverNode(override var gestureContext: GestureContext) :
         }
 
         coroutineScope.launch {
-            while (true) {
+            while (animatedApproachMeasurement.isObserved) {
                 withFrameNanos { animatedApproachMeasurement.computeOutput() }
             }
         }
@@ -282,7 +284,7 @@ private class MotionDriverNode(override var gestureContext: GestureContext) :
         stableThreshold: Float,
         private val onDispose: AnimatedApproachMeasurementImpl.() -> Unit,
     ) : MotionDriver.AnimatedApproachMeasurement {
-        private var isObserved = true
+        var isObserved = true
         private var lastInput: Float? = null
 
         val motionValue: MotionValue =

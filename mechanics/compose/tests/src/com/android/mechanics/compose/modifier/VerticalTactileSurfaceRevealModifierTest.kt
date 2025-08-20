@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -52,8 +53,8 @@ import com.android.compose.animation.scene.featureOfElement
 import com.android.compose.animation.scene.mechanics.rememberGestureContext
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
-import com.android.mechanics.debug.MotionValueDebuggerState
-import com.android.mechanics.debug.motionValueDebugger
+import com.android.mechanics.debug.LocalMotionValueDebugController
+import com.android.mechanics.debug.MotionValueDebugController
 import com.android.mechanics.spec.builder.MotionBuilderContext
 import com.android.mechanics.spec.builder.rememberMotionBuilderContext
 import com.android.mechanics.testing.FakeMotionSpecBuilderContext
@@ -84,7 +85,7 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
             createGoldenPathManager("frameworks/libs/systemui/mechanics/compose/tests/goldens")
         )
 
-    private val debugger = MotionValueDebuggerState()
+    private val debugger = MotionValueDebugController()
 
     private fun assertVerticalTactileSurfaceRevealMotion(
         goldenName: String,
@@ -135,57 +136,62 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
             val motion =
                 recordMotion(
                     content = {
-                        state =
-                            rememberMutableSceneTransitionLayoutState(
-                                initialScene = gestureControl.startScene,
-                                initialOverlays = gestureControl.startOverlays,
-                                transitions =
-                                    transitions {
-                                        from(CollapsedScene, to = ExpandedOverlay) {
-                                            scaleSize(ContainerElement, height = 0f)
-                                        }
-                                        from(CollapsedScene, to = ExpandedScene) {
-                                            scaleSize(ContainerElement, height = 0f)
-                                        }
-                                    },
-                            )
-                        SceneTransitionLayout(
-                            state = state,
-                            modifier =
-                                Modifier.background(Color.Yellow)
-                                    .size(ContainerSize)
-                                    .testTag(STL_TAG)
-                                    .motionValueDebugger(debugger),
-                            implicitTestTags = true,
+                        CompositionLocalProvider(
+                            LocalMotionValueDebugController provides debugger
                         ) {
-                            scene(
-                                key = CollapsedScene,
-                                userActions =
-                                    mapOf(
-                                        if (useOverlays) {
-                                            Swipe.Down to ExpandedOverlay
-                                        } else {
-                                            Swipe.Down to ExpandedScene
-                                        }
-                                    ),
-                                content = { Box(modifier = Modifier.fillMaxSize()) },
-                            )
-                            if (useOverlays) {
-                                overlay(
-                                    ExpandedOverlay,
+                            state =
+                                rememberMutableSceneTransitionLayoutState(
+                                    initialScene = gestureControl.startScene,
+                                    initialOverlays = gestureControl.startOverlays,
+                                    transitions =
+                                        transitions {
+                                            from(CollapsedScene, to = ExpandedOverlay) {
+                                                scaleSize(ContainerElement, height = 0f)
+                                            }
+                                            from(CollapsedScene, to = ExpandedScene) {
+                                                scaleSize(ContainerElement, height = 0f)
+                                            }
+                                        },
+                                )
+                            SceneTransitionLayout(
+                                state = state,
+                                modifier =
+                                    Modifier.background(Color.Yellow)
+                                        .size(ContainerSize)
+                                        .testTag(STL_TAG),
+                                implicitTestTags = true,
+                            ) {
+                                scene(
+                                    key = CollapsedScene,
                                     userActions =
                                         mapOf(
-                                            Swipe.Up to
-                                                UserActionResult.HideOverlay(ExpandedOverlay)
+                                            if (useOverlays) {
+                                                Swipe.Down to ExpandedOverlay
+                                            } else {
+                                                Swipe.Down to ExpandedScene
+                                            }
                                         ),
-                                    content = { TestContent(Modifier.border(2.dp, Color.Magenta)) },
+                                    content = { Box(modifier = Modifier.fillMaxSize()) },
                                 )
-                            } else {
-                                scene(
-                                    key = ExpandedScene,
-                                    userActions = mapOf(Swipe.Up to CollapsedScene),
-                                    content = { TestContent(Modifier.border(2.dp, Color.Cyan)) },
-                                )
+                                if (useOverlays) {
+                                    overlay(
+                                        ExpandedOverlay,
+                                        userActions =
+                                            mapOf(
+                                                Swipe.Up to
+                                                    UserActionResult.HideOverlay(ExpandedOverlay)
+                                            ),
+                                        content = {
+                                            TestContent(Modifier.border(2.dp, Color.Magenta))
+                                        },
+                                    )
+                                } else {
+                                    scene(
+                                        key = ExpandedScene,
+                                        userActions = mapOf(Swipe.Up to CollapsedScene),
+                                        content = { TestContent(Modifier.border(2.dp, Color.Cyan)) },
+                                    )
+                                }
                             }
                         }
                     },
@@ -197,8 +203,7 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
                             )
 
                             awaitCondition {
-                                !state.isTransitioning() &&
-                                    debugger.observedMotionValues.all { it.isStable }
+                                !state.isTransitioning() && debugger.observed.all { it.isStable }
                             }
                         },
                         timeSeriesCapture = {
