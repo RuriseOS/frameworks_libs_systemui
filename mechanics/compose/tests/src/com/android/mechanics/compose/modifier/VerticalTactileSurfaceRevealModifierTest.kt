@@ -49,6 +49,7 @@ import com.android.compose.animation.scene.SceneTransitionLayout
 import com.android.compose.animation.scene.Swipe
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.featureOfElement
+import com.android.compose.animation.scene.mechanics.rememberGestureContext
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
 import com.android.mechanics.debug.MotionValueDebuggerState
@@ -99,11 +100,11 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
             val boxes = 8
             @Composable
             fun ContentScope.TestContent(modifier: Modifier = Modifier) {
-                val contentScope = this
                 Box(modifier = modifier.fillMaxSize()) {
                     Column(
                         modifier =
                             Modifier.element(ContainerElement)
+                                .motionDriver(rememberGestureContext())
                                 .verticalScroll(rememberScrollState())
                                 .background(Color.LightGray)
                                 .padding(4.dp),
@@ -121,9 +122,7 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
                                         },
                                     )
                                     .verticalTactileSurfaceReveal(
-                                        contentScope = contentScope,
                                         motionBuilderContext = rememberMotionBuilderContext(),
-                                        container = ContainerElement,
                                         label = "box$it",
                                     )
                                     .size(50.dp)

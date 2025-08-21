@@ -16,8 +16,11 @@
 
 package com.android.mechanics.compose.modifier
 
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.layout.ApproachLayoutModifierNode
 import androidx.compose.ui.layout.ApproachMeasureScope
@@ -26,25 +29,17 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.node.ObserverModifierNode
-import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.toIntRect
-import androidx.compose.ui.unit.toRect
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.util.fastCoerceAtLeast
-import androidx.compose.ui.util.fastCoerceIn
-import com.android.compose.animation.scene.ContentScope
-import com.android.compose.animation.scene.ElementKey
-import com.android.compose.animation.scene.content.state.TransitionState
-import com.android.compose.animation.scene.mechanics.gestureContextOrDefault
 import com.android.mechanics.effects.RevealOnThreshold
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
 import com.android.mechanics.spec.builder.MotionBuilderContext
-import com.android.mechanics.spec.builder.directionalMotionSpec
+import com.android.mechanics.spec.builder.fixedSpatialValueSpec
 import com.android.mechanics.spec.builder.spatialMotionSpec
 import kotlin.math.roundToInt
 
@@ -56,9 +51,7 @@ import kotlin.math.roundToInt
  *   CompositionLocalConsumerModifierNode, instead of passing it.
  */
 fun Modifier.verticalTactileSurfaceReveal(
-    contentScope: ContentScope,
     motionBuilderContext: MotionBuilderContext,
-    container: ElementKey,
     deltaY: Float = 0f,
     revealOnThreshold: RevealOnThreshold = DefaultRevealOnThreshold,
     label: String? = null,
@@ -66,9 +59,7 @@ fun Modifier.verticalTactileSurfaceReveal(
 ): Modifier =
     this then
         VerticalTactileSurfaceRevealElement(
-            contentScope = contentScope,
             motionBuilderContext = motionBuilderContext,
-            container = container,
             deltaY = deltaY,
             revealOnThreshold = revealOnThreshold,
             label = label,
@@ -78,9 +69,7 @@ fun Modifier.verticalTactileSurfaceReveal(
 private val DefaultRevealOnThreshold = RevealOnThreshold()
 
 private data class VerticalTactileSurfaceRevealElement(
-    val contentScope: ContentScope,
     val motionBuilderContext: MotionBuilderContext,
-    val container: ElementKey,
     val deltaY: Float,
     val revealOnThreshold: RevealOnThreshold,
     val label: String?,
@@ -88,9 +77,7 @@ private data class VerticalTactileSurfaceRevealElement(
 ) : ModifierNodeElement<VerticalTactileSurfaceRevealNode>() {
     override fun create(): VerticalTactileSurfaceRevealNode =
         VerticalTactileSurfaceRevealNode(
-            contentScope = contentScope,
             motionBuilderContext = motionBuilderContext,
-            container = container,
             deltaY = deltaY,
             revealOnThreshold = revealOnThreshold,
             label = label,
@@ -99,9 +86,7 @@ private data class VerticalTactileSurfaceRevealElement(
 
     override fun update(node: VerticalTactileSurfaceRevealNode) {
         node.update(
-            contentScope = contentScope,
             motionBuilderContext = motionBuilderContext,
-            container = container,
             deltaY = deltaY,
             revealOnThreshold = revealOnThreshold,
         )
@@ -109,7 +94,6 @@ private data class VerticalTactileSurfaceRevealElement(
 
     override fun InspectorInfo.inspectableProperties() {
         name = "tactileSurfaceReveal"
-        properties["container"] = container
         properties["deltaY"] = deltaY
         properties["revealOnThreshold"] = revealOnThreshold
         properties["label"] = label
@@ -118,101 +102,67 @@ private data class VerticalTactileSurfaceRevealElement(
 }
 
 private class VerticalTactileSurfaceRevealNode(
-    private var contentScope: ContentScope,
     private var motionBuilderContext: MotionBuilderContext,
-    private var container: ElementKey,
-    private var deltaY: Float,
+    deltaY: Float,
     private var revealOnThreshold: RevealOnThreshold,
-    label: String?,
-    debug: Boolean,
-) : DelegatingNode(), ApproachLayoutModifierNode, ObserverModifierNode {
+    private val label: String?,
+    private val debug: Boolean,
+) : DelegatingNode(), ApproachLayoutModifierNode {
+    private var lookAheadHeight by mutableFloatStateOf(0f)
+    private var layoutOffsetY by mutableFloatStateOf(0f)
+    private var deltaY: Float by mutableFloatStateOf(deltaY)
 
-    private val motionValueNode: MotionValueNode =
-        delegate(
-            MotionValueNode(
-                input = {
-                    with(contentScope) {
-                        val containerHeight =
-                            container.lastSize(contentKey)?.height ?: return@MotionValueNode 0f
-                        containerHeight + deltaY
-                    }
-                },
-                gestureContext = contentScope.gestureContextOrDefault(),
-                initialSpec = MotionSpec(directionalMotionSpec(Mapping.Zero)),
-                label = "TactileSurfaceReveal(${label.orEmpty()})",
-                stableThreshold = MotionBuilderContext.StableThresholdSpatial,
-                debug = debug,
-            )
-        )
+    private lateinit var animatedApproachMeasurement: MotionDriver.AnimatedApproachMeasurement
+    private lateinit var motionDriver: MotionDriver
 
     fun update(
-        contentScope: ContentScope,
         motionBuilderContext: MotionBuilderContext,
-        container: ElementKey,
         deltaY: Float,
         revealOnThreshold: RevealOnThreshold,
     ) {
-        this.contentScope = contentScope
         this.motionBuilderContext = motionBuilderContext
-        this.container = container
         this.deltaY = deltaY
         this.revealOnThreshold = revealOnThreshold
-        updateMotionSpec(contentScope.layoutState.transitionState)
     }
 
     override fun onAttach() {
-        onObservedReadsChanged()
+        motionDriver = findMotionDriver()
+        animatedApproachMeasurement =
+            motionDriver.animatedApproachMeasurement(
+                request = MotionDriver.RequestConstraints.MaxHeight,
+                spec = derivedStateOf(::spec)::value,
+                label = "TactileSurfaceReveal(${label.orEmpty()})",
+                debug = debug,
+            )
     }
 
-    override fun onObservedReadsChanged() {
-        observeReads { updateMotionSpec(contentScope.layoutState.transitionState) }
+    override fun onDetach() {
+        animatedApproachMeasurement.dispose()
     }
 
-    private var targetBounds = Rect.Zero
-
-    private fun updateMotionSpec(transitionState: TransitionState) {
-        val height = targetBounds.height
-        if (height == 0f) {
+    private fun spec(): MotionSpec {
+        if (lookAheadHeight == 0f) {
             // We cannot compute specs for height 0.
-            motionValueNode.updateSpec(MotionSpec(directionalMotionSpec(Mapping.Fixed(0f))))
-            return
+            return motionBuilderContext.fixedSpatialValueSpec(0f)
         }
 
-        motionValueNode.updateSpec(
-            when (transitionState) {
-                is TransitionState.Idle -> {
-                    val containerMinHeight = 0
-                    val overlays = transitionState.currentOverlays
-                    val scene = transitionState.currentScene
-                    // The content is revealed if its height exceeds the minimum container height.
-                    val isRevealed =
-                        with(contentScope) {
-                            // Determine the target content's height, prioritizing overlays, then
-                            // the current scene.
-                            val targetSize =
-                                overlays.firstNotNullOfOrNull { container.targetSize(it) }
-                                    ?: container.targetSize(scene)
-                            val targetHeight = targetSize?.height ?: 0
-                            targetHeight > containerMinHeight
-                        }
-                    MotionSpec(directionalMotionSpec(Mapping.Fixed(if (isRevealed) height else 0f)))
-                }
-
-                is TransitionState.Transition -> {
-                    motionBuilderContext.spatialMotionSpec(Mapping.Zero) {
-                        between(
-                            start = targetBounds.top,
-                            end = targetBounds.bottom,
-                            effect = revealOnThreshold,
-                        )
-                    }
+        return when (motionDriver.verticalState) {
+            MotionDriver.State.MinValue -> {
+                motionBuilderContext.fixedSpatialValueSpec(0f)
+            }
+            MotionDriver.State.Transition -> {
+                motionBuilderContext.spatialMotionSpec(Mapping.Zero) {
+                    between(
+                        start = layoutOffsetY + deltaY,
+                        end = layoutOffsetY + deltaY + lookAheadHeight,
+                        effect = revealOnThreshold,
+                    )
                 }
             }
-        )
-    }
-
-    override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean {
-        return !motionValueNode.isOutputFixed
+            MotionDriver.State.MaxValue -> {
+                motionBuilderContext.fixedSpatialValueSpec(lookAheadHeight)
+            }
+        }
     }
 
     override fun MeasureScope.measure(
@@ -220,33 +170,32 @@ private class VerticalTactileSurfaceRevealNode(
         constraints: Constraints,
     ): MeasureResult {
         val placeable = measurable.measure(constraints)
+        if (isLookingAhead) {
+            lookAheadHeight = placeable.height.toFloat()
+        }
         return layout(placeable.width, placeable.height) {
-            val coordinates = coordinates
-            if (isLookingAhead && coordinates != null) {
-                val containerCoordinates =
-                    with(contentScope) { container.targetCoordinates(contentKey)!! }
-                val containerOffset = containerCoordinates.localPositionOf(coordinates)
-                val bounds = coordinates.size.toIntRect().toRect().translate(containerOffset)
-                if (targetBounds != bounds) {
-                    targetBounds = bounds
-                    updateMotionSpec(contentScope.layoutState.transitionState)
-                }
+            if (isLookingAhead) {
+                layoutOffsetY = with(motionDriver) { driverOffset() }.y
             }
             placeable.place(IntOffset.Zero)
         }
+    }
+
+    override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean {
+        return animatedApproachMeasurement.inProgress
     }
 
     override fun ApproachMeasureScope.approachMeasure(
         measurable: Measurable,
         constraints: Constraints,
     ): MeasureResult {
-        val height = motionValueNode.output.roundToInt().fastCoerceAtLeast(0)
-
+        val height = constraints.constrainHeight(animatedApproachMeasurement.value.roundToInt())
         val animatedConstraints = constraints.copy(maxHeight = height)
+
         return measurable.measure(animatedConstraints).run {
             layout(width, height) {
-                val revealAlpha = (height / revealOnThreshold.minSize.toPx()).fastCoerceIn(0f, 1f)
-                if (revealAlpha < 1) {
+                val revealAlpha = (height / revealOnThreshold.minSize.toPx()).fastCoerceAtLeast(0f)
+                if (revealAlpha < 1f) {
                     placeWithLayer(IntOffset.Zero) {
                         alpha = revealAlpha
                         compositingStrategy = CompositingStrategy.ModulateAlpha
