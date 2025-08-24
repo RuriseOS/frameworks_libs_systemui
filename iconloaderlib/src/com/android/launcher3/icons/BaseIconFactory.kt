@@ -40,8 +40,8 @@ import com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
 import com.android.launcher3.icons.ShadowGenerator.BLUR_FACTOR
 import com.android.launcher3.util.FlagOp
 import com.android.launcher3.util.UserIconInfo
-import com.android.launcher3.util.UserIconInfo.TYPE_MAIN
-import com.android.launcher3.util.UserIconInfo.TYPE_WORK
+import com.android.launcher3.util.UserIconInfo.Companion.TYPE_MAIN
+import com.android.launcher3.util.UserIconInfo.Companion.TYPE_WORK
 import com.android.systemui.shared.Flags.extendibleThemeManager
 import java.lang.ref.WeakReference
 import kotlin.annotation.AnnotationRetention.SOURCE
