@@ -77,7 +77,7 @@ class DirectionalMotionSpecTest {
 
     @Test
     fun findBreakpointIndex_returnsMinForEmptySpec() {
-        val underTest = DirectionalMotionSpec.Empty
+        val underTest = DirectionalMotionSpec.Identity
 
         assertThat(underTest.findBreakpointIndex(0f)).isEqualTo(0)
         assertThat(underTest.findBreakpointIndex(Float.MAX_VALUE)).isEqualTo(0)
@@ -86,7 +86,7 @@ class DirectionalMotionSpecTest {
 
     @Test
     fun findBreakpointIndex_throwsForNonFiniteInput() {
-        val underTest = DirectionalMotionSpec.Empty
+        val underTest = DirectionalMotionSpec.Identity
 
         assertFailsWith<IllegalArgumentException> { underTest.findBreakpointIndex(Float.NaN) }
         assertFailsWith<IllegalArgumentException> {

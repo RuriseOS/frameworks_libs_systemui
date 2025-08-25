@@ -52,7 +52,7 @@ class MotionValueDebuggerTest {
             CompositionLocalProvider(LocalMotionValueDebugController provides debuggerState) {
                 if (hasValue) {
                     val toDebug = remember {
-                        MotionValue(input, gestureContext, { MotionSpec.Empty })
+                        MotionValue(input, gestureContext, { MotionSpec.Identity })
                     }
                     Box(modifier = Modifier.debugMotionValue(toDebug))
                 }
@@ -76,7 +76,7 @@ class MotionValueDebuggerTest {
             CompositionLocalProvider(LocalMotionValueDebugController provides debuggerState) {
                 if (hasValue) {
                     val toDebug = remember {
-                        MotionValue(input, gestureContext, { MotionSpec.Empty })
+                        MotionValue(input, gestureContext, { MotionSpec.Identity })
                     }
                     Box(modifier = Modifier.debugMotionValue(toDebug))
                 }
@@ -93,7 +93,7 @@ class MotionValueDebuggerTest {
     @Test
     fun debugMotionValue_noDebugger_isNoOp() {
         rule.setContent {
-            val toDebug = remember { MotionValue(input, gestureContext, { MotionSpec.Empty }) }
+            val toDebug = remember { MotionValue(input, gestureContext, { MotionSpec.Identity }) }
             Box(modifier = Modifier.debugMotionValue(toDebug))
         }
     }
