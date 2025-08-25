@@ -49,7 +49,7 @@ class ViewMotionValue
 constructor(
     initialInput: Float,
     gestureContext: ViewGestureContext,
-    initialSpec: MotionSpec = MotionSpec.Empty,
+    initialSpec: MotionSpec = MotionSpec.Identity,
     label: String? = null,
     stableThreshold: Float = StableThresholdEffect,
 ) : DisposableHandle {

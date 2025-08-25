@@ -77,7 +77,7 @@ class ViewMotionValueTest {
     @Test
     fun emptySpec_outputMatchesInput_withoutAnimation() =
         motion.goldenTest(
-            spec = MotionSpec.Empty,
+            spec = MotionSpec.Identity,
             verifyTimeSeries = {
                 // Output always matches the input
                 assertThat(output).containsExactlyElementsIn(input).inOrder()
@@ -117,14 +117,14 @@ class ViewMotionValueTest {
             },
         ) {
             animateValueTo(10f, changePerFrame = 5f)
-            spec = MotionSpec.Empty
+            spec = MotionSpec.Identity
             animateValueTo(20f, changePerFrame = 5f)
         }
 
     @Test
     fun unspecifiedSpec_onAlreadyInitializedValue_throws() {
         assertFailsWith<IllegalArgumentException> {
-            motion.goldenTest(spec = MotionSpec.Empty) {
+            motion.goldenTest(spec = MotionSpec.Identity) {
                 animateValueTo(10f, changePerFrame = 5f)
                 spec = MotionSpec.InitiallyUndefined
                 animateValueTo(20f, changePerFrame = 5f)
@@ -216,7 +216,7 @@ class ViewMotionValueTest {
     fun update_triggersCallback() = runTest {
         runBlocking(Dispatchers.Main) {
             val gestureContext = DistanceGestureContext(0f, InputDirection.Max, 5f)
-            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Empty)
+            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Identity)
 
             var invocationCount = 0
             underTest.addUpdateCallback { invocationCount++ }
@@ -231,7 +231,7 @@ class ViewMotionValueTest {
     fun update_setSameValue_doesNotTriggerCallback() = runTest {
         runBlocking(Dispatchers.Main) {
             val gestureContext = DistanceGestureContext(0f, InputDirection.Max, 5f)
-            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Empty)
+            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Identity)
 
             // Ensure the initial update has been processed
             animatorTestRule.advanceTimeBy(16L)
@@ -290,7 +290,7 @@ class ViewMotionValueTest {
     fun debugInspector_sameInstance_whileInUse() = runTest {
         runBlocking(Dispatchers.Main) {
             val gestureContext = DistanceGestureContext(0f, InputDirection.Max, 5f)
-            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Empty)
+            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Identity)
 
             val originalInspector = underTest.debugInspector()
             assertThat(underTest.debugInspector()).isSameInstanceAs(originalInspector)
@@ -301,7 +301,7 @@ class ViewMotionValueTest {
     fun debugInspector_newInstance_afterUnused() = runTest {
         runBlocking(Dispatchers.Main) {
             val gestureContext = DistanceGestureContext(0f, InputDirection.Max, 5f)
-            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Empty)
+            val underTest = ViewMotionValue(0f, gestureContext, MotionSpec.Identity)
 
             val originalInspector = underTest.debugInspector()
             originalInspector.dispose()

@@ -26,7 +26,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SegmentTest {
 
-    private val fakeSpec = MotionSpec.Empty
+    private val fakeSpec = MotionSpec.Identity
 
     @Test
     fun segmentData_isValidForInput_betweenBreakpointsSameDirection_isTrue() {

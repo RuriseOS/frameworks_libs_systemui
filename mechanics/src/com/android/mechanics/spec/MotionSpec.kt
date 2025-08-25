@@ -148,8 +148,8 @@ data class MotionSpec(
          */
         private val DefaultResetSpring = SpringParameters(stiffness = 1400f, dampingRatio = 1f)
 
-        /* Empty motion spec, the output is the same as the input. */
-        val Empty = MotionSpec(DirectionalMotionSpec.Empty)
+        /* Identity motion spec, the output is the same as the input. */
+        val Identity = MotionSpec(DirectionalMotionSpec.Identity)
 
         /**
          * Placeholder to indicate that a [MotionSpec] cannot be supplied yet.
@@ -254,8 +254,8 @@ data class DirectionalMotionSpec(
     override fun toString() = toDebugString()
 
     companion object {
-        /* Empty spec, the full input domain is mapped to output using [Mapping.identity]. */
-        val Empty =
+        /* Identity spec, the full input domain is mapped to output using [Mapping.identity]. */
+        val Identity =
             DirectionalMotionSpec(
                 listOf(Breakpoint.minLimit, Breakpoint.maxLimit),
                 listOf(Mapping.Identity),
