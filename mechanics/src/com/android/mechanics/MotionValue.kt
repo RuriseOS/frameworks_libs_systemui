@@ -17,6 +17,7 @@
 package com.android.mechanics
 
 import androidx.compose.runtime.FloatState
+import androidx.compose.runtime.annotation.FrequentlyChangingValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -139,10 +140,11 @@ class MotionValue(
         )
 
     /** The [MotionSpec] describing the mapping of this [MotionValue]'s input to the output. */
-    val spec: MotionSpec by impl::spec
+    // TODO(b/441041846): This should not change frequently
+    @get:FrequentlyChangingValue val spec: MotionSpec by impl::spec
 
     /** Animated [output] value. */
-    val output: Float by impl::output
+    @get:FrequentlyChangingValue val output: Float by impl::output
 
     /**
      * [output] value, but without animations.
@@ -151,13 +153,15 @@ class MotionValue(
      *
      * While [isStable], [outputTarget] and [output] are the same value.
      */
-    val outputTarget: Float by impl::outputTarget
+    // TODO(b/441041846): This should not change frequently
+    @get:FrequentlyChangingValue val outputTarget: Float by impl::outputTarget
 
     /** The [output] exposed as [FloatState]. */
-    override val floatValue: Float by impl::output
+    @get:FrequentlyChangingValue override val floatValue: Float by impl::output
 
     /** Whether an animation is currently running. */
-    val isStable: Boolean by impl::isStable
+    // TODO(b/441041846): This should not change frequently
+    @get:FrequentlyChangingValue val isStable: Boolean by impl::isStable
 
     /**
      * Whether the output can change its value.
@@ -167,18 +171,23 @@ class MotionValue(
      * output is guaranteed not to change unless the [spec] or the input (enough to change segments)
      * changes. This can be used to avoid unnecessary work like recomposition or re-measurement.
      */
-    val isOutputFixed: Boolean by impl::isOutputFixed
+    // TODO(b/441041846): This should not change frequently
+    @get:FrequentlyChangingValue val isOutputFixed: Boolean by impl::isOutputFixed
 
     /**
      * The current value for the [SemanticKey].
      *
      * `null` if not defined in the spec.
      */
+    // TODO(b/441041846): This should not change frequently
+    @FrequentlyChangingValue
     operator fun <T> get(key: SemanticKey<T>): T? {
         return impl.semanticState(key)
     }
 
     /** The current segment used to compute the output. */
+    // TODO(b/441041846): This should not change frequently
+    @get:FrequentlyChangingValue
     val segmentKey: SegmentKey
         get() = impl.currentComputedValues.segment.key
 
