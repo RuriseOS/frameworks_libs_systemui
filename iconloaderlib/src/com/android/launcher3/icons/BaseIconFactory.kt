@@ -29,6 +29,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
 import android.os.UserHandle
+import android.util.Log
 import android.util.SparseArray
 import androidx.annotation.ColorInt
 import androidx.annotation.IntDef
@@ -100,21 +101,22 @@ constructor(
             IconOptions().setExtractedColor(color),
         )
 
-    fun createIconBitmap(icon: Bitmap): BitmapInfo =
+    fun createIconBitmap(icon: Bitmap, isFullBleed: Boolean): BitmapInfo =
         if (iconBitmapSize != icon.width || iconBitmapSize != icon.height)
             createBadgedIconBitmap(
                 BitmapDrawable(context.resources, icon),
                 IconOptions()
                     .setWrapNonAdaptiveIcon(false)
                     .setIconScale(1f)
-                    .assumeFullBleedIcon(icon.width == icon.height && !icon.hasAlpha()),
+                    .assumeFullBleedIcon(isFullBleed && isIconFullBleed(icon))
+                    .setDrawFullBleed(isFullBleed && isIconFullBleed(icon))
             )
         else
             BitmapInfo(
                 icon = icon,
                 color = findDominantColorByHue(icon),
                 defaultIconShape = defaultIconShape,
-                flags = if (icon.hasAlpha()) 0 else BitmapInfo.FLAG_FULL_BLEED,
+                flags = if (isFullBleed && isIconFullBleed(icon)) BitmapInfo.FLAG_FULL_BLEED else 0
             )
 
     fun createScaledBitmap(icon: Drawable, @BitmapGenerationMode mode: Int): Bitmap =
@@ -243,6 +245,10 @@ constructor(
     /** Simple check to check if the provided user is work profile or not based on badging */
     private fun UserHandle.isWorkUser() =
         NoopDrawable().let { d -> d !== context.packageManager.getUserBadgedIcon(d, this) }
+
+    private fun isIconFullBleed(icon: Bitmap): Boolean {
+        return icon.height == icon.width && !icon.hasAlpha()
+    }
 
     /**
      * Wraps this drawable in [InsetDrawable] such that the final drawable has square bounds, while
