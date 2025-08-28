@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,20 @@
 
 package com.android.mechanics.testing
 
+import android.annotation.SuppressLint
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import com.android.mechanics.DistanceGestureContext
-import com.android.mechanics.MotionValue
+import com.android.mechanics.ManagedMotionValue
+import com.android.mechanics.MotionValueCollection
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.MotionSpec
+import com.android.mechanics.testing.ComposeMotionValueToolkit.createTimeSeries
 import com.android.mechanics.testing.MotionValueToolkit.Companion.FrameDuration
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,112 +44,146 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import platform.test.motion.MotionTestRule
 import platform.test.motion.compose.runMonotonicClockTest
+import platform.test.motion.golden.FeatureCapture
 import platform.test.motion.golden.FrameId
 import platform.test.motion.golden.TimeSeries
 import platform.test.motion.golden.TimestampFrameId
+import platform.test.motion.golden.asDataPoint
 
-/** Toolkit to support [MotionValue] motion tests. */
-data object ComposeMotionValueToolkit :
+interface CollectionInputScope : InputScope<MotionValueCollection, DistanceGestureContext> {
+    val motionValues: Set<ManagedMotionValue>
+
+    fun motionValueWithLabel(label: String): ManagedMotionValue?
+}
+
+/** Toolkit to support [MotionValueCollection] motion tests. */
+object ComposeMotionValueCollectionToolkit :
     MotionValueToolkit<
-        InputScope<MotionValue, DistanceGestureContext>,
-        MotionValue,
-        MotionValue,
+        CollectionInputScope,
+        MotionValueCollection,
+        ManagedMotionValue,
         DistanceGestureContext,
     >() {
 
+    @SuppressLint("VisibleForTests")
     override fun goldenTest(
         motionTestRule: MotionTestRule<*>,
         spec: MotionSpec,
-        createDerived: (underTest: MotionValue) -> List<MotionValue>,
+        createDerived: (underTest: MotionValueCollection) -> List<ManagedMotionValue>,
         initialValue: Float,
         initialDirection: InputDirection,
         directionChangeSlop: Float,
         stableThreshold: Float,
         verifyTimeSeries: TimeSeries.() -> VerifyTimeSeriesResult,
         capture: CaptureTimeSeriesFn,
-        testInput: suspend InputScope<MotionValue, DistanceGestureContext>.() -> Unit,
+        testInput: suspend CollectionInputScope.() -> Unit,
     ) = runMonotonicClockTest {
-        val frameEmitter = MutableStateFlow<Long>(0)
-
+        val frameEmitter = MutableStateFlow(0L)
         val testHarness =
-            ComposeMotionValueTestHarness(
+            ComposeMotionValueCollectionTestHarness(
+                frameEmitter.asStateFlow(),
+                spec,
                 initialValue,
                 initialDirection,
-                spec,
-                stableThreshold,
                 directionChangeSlop,
-                frameEmitter.asStateFlow(),
-                createDerived,
+                stableThreshold,
             )
         val underTest = testHarness.underTest
-        val derived = testHarness.derived
+        testHarness.createMotionValue("primary", testHarness::spec)
+        createDerived(underTest)
 
         val motionValueCaptures = buildList {
-            add(MotionValueCapture(underTest.debugInspector()))
-            derived.forEach { add(MotionValueCapture(it.debugInspector(), "${it.label}-")) }
+            testHarness.motionValues.forEach {
+                add(MotionValueCapture(it.debugInspector(), "${it.label}-"))
+            }
         }
 
-        val keepRunningJobs = (derived + underTest).map { launch { it.keepRunning() } }
+        val collectionCapture = GenericValueCapture(testHarness.underTest)
 
-        val recordingJob = launch { testInput.invoke(testHarness) }
+        val keepRunningJob = launch { underTest.keepRunning() }
 
+        val latch = CompletableDeferred<Unit>()
+
+        val recordingJob = launch {
+            latch.await()
+            testInput.invoke(testHarness)
+        }
         val frameIds = mutableListOf<FrameId>()
 
         fun recordFrame(frameId: TimestampFrameId) {
             frameIds.add(frameId)
+
+            collectionCapture.captureCurrentFrame {
+                feature(FeatureCapture("input") { it.currentInput.asDataPoint() })
+                feature(
+                    FeatureCapture("gestureDirection") { it.currentDirection.name.asDataPoint() }
+                )
+            }
             motionValueCaptures.forEach { it.captureCurrentFrame(capture) }
         }
+
         runBlocking(Dispatchers.Main) {
+            while (!underTest.isActive) {
+                testScheduler.runCurrent()
+                Snapshot.sendApplyNotifications()
+                testScheduler.advanceTimeBy(FrameDuration)
+                testScheduler.runCurrent()
+            }
+
+            latch.complete(Unit)
+
             val startFrameTime = testScheduler.currentTime
             while (!recordingJob.isCompleted) {
                 recordFrame(TimestampFrameId(testScheduler.currentTime - startFrameTime))
 
-                // Emulate setting input *before* the frame advances. This ensures the `testInput`
-                // coroutine will continue if needed. The specific value for frameEmitter is
-                // irrelevant, it only requires to be unique per frame.
                 frameEmitter.tryEmit(testScheduler.currentTime)
                 testScheduler.runCurrent()
-                // Whenever keepRunning was suspended, allow the snapshotFlow to wake up
                 Snapshot.sendApplyNotifications()
 
-                // Now advance the test clock
                 testScheduler.advanceTimeBy(FrameDuration)
-                // Since the tests capture the debugInspector output, make sure keepRunning()
-                // was able to complete the frame.
                 testScheduler.runCurrent()
             }
         }
 
-        val timeSeries = createTimeSeries(frameIds, motionValueCaptures)
+        val timeSeries =
+            createTimeSeries(
+                frameIds,
+                buildList {
+                    add(collectionCapture)
+                    addAll(motionValueCaptures)
+                },
+            )
         motionValueCaptures.forEach { it.debugger.dispose() }
-        keepRunningJobs.forEach { it.cancel() }
+        keepRunningJob.cancel()
         verifyTimeSeries(motionTestRule, timeSeries, verifyTimeSeries)
     }
 }
 
-private class ComposeMotionValueTestHarness(
+private class ComposeMotionValueCollectionTestHarness(
+    private val onFrame: StateFlow<Long>,
+    primarySpec: MotionSpec,
     initialInput: Float,
     initialDirection: InputDirection,
-    override var spec: MotionSpec,
-    stableThreshold: Float,
     directionChangeSlop: Float,
-    val onFrame: StateFlow<Long>,
-    createDerived: (underTest: MotionValue) -> List<MotionValue>,
-) : InputScope<MotionValue, DistanceGestureContext> {
+    stableThreshold: Float,
+) : CollectionInputScope {
+    override val motionValues: Set<ManagedMotionValue>
+        get() = underTest.managedMotionValues
+
+    override fun motionValueWithLabel(label: String): ManagedMotionValue? {
+        return motionValues.firstOrNull { it.label == label }
+    }
 
     override var input by mutableFloatStateOf(initialInput)
-    override val gestureContext: DistanceGestureContext =
+    override val gestureContext =
         DistanceGestureContext(initialInput, initialDirection, directionChangeSlop)
 
-    override val underTest =
-        MotionValue(
-            input = { input },
-            gestureContext = gestureContext,
-            spec = { spec },
-            stableThreshold = stableThreshold,
-        )
+    override val underTest = MotionValueCollection(::input, gestureContext, stableThreshold)
+    override var spec: MotionSpec by mutableStateOf(primarySpec)
 
-    val derived = createDerived(underTest)
+    fun createMotionValue(label: String, spec: () -> MotionSpec): ManagedMotionValue {
+        return underTest.create(spec, label)
+    }
 
     override fun updateInput(value: Float) {
         input = value
@@ -152,28 +191,16 @@ private class ComposeMotionValueTestHarness(
     }
 
     override suspend fun awaitStable() {
-        val debugInspectors = buildList {
-            add(underTest.debugInspector())
-            addAll(derived.map { it.debugInspector() })
-        }
+        val debugInspectors = buildList { addAll(motionValues.map { it.debugInspector() }) }
         try {
-
-            onFrame
-                // Since this is a state-flow, the current frame is counted too.
-                .drop(1)
-                .takeWhile { debugInspectors.any { !it.frame.isStable } }
-                .collect {}
+            onFrame.drop(1).takeWhile { debugInspectors.any { !it.frame.isStable } }.collect {}
         } finally {
             debugInspectors.forEach { it.dispose() }
         }
     }
 
     override suspend fun awaitFrames(frames: Int) {
-        onFrame
-            // Since this is a state-flow, the current frame is counted too.
-            .drop(1)
-            .take(frames)
-            .collect {}
+        onFrame.drop(1).take(frames).collect {}
     }
 
     override fun reset(position: Float, direction: InputDirection) {
