@@ -80,6 +80,8 @@ object GraphicsUtils {
     /** Compresses BitmapInfo default shape bitmap to a byte array **/
     @JvmStatic
     fun createDefaultFlatBitmap(bitmapInfo: BitmapInfo): ByteArray {
+        // BitmapInfo uses immutable hardware bitmaps, so we need to make a software copy to apply
+        // the default shape mask.
         val bitmap = bitmapInfo.icon.copy(Bitmap.Config.ARGB_8888, /* isMutable **/ true)
         val cropBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(cropBitmap)
