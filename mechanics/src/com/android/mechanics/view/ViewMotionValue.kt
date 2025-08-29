@@ -69,7 +69,7 @@ constructor(
     var spec: MotionSpec by impl::spec
 
     /** Animated [output] value. */
-    val output: Float by impl::output
+    val output: Float by impl::computedOutput
 
     /**
      * [output] value, but without animations.
@@ -78,10 +78,10 @@ constructor(
      *
      * While [isStable], [outputTarget] and [output] are the same value.
      */
-    val outputTarget: Float by impl::outputTarget
+    val outputTarget: Float by impl::computedOutputTarget
 
     /** Whether an animation is currently running. */
-    val isStable: Boolean by impl::isStable
+    val isStable: Boolean by impl::computedIsStable
 
     /**
      * The current value for the [SemanticKey].
@@ -89,7 +89,7 @@ constructor(
      * `null` if not defined in the spec.
      */
     operator fun <T> get(key: SemanticKey<T>): T? {
-        return impl.semanticState(key)
+        return impl.computedSemanticState(key)
     }
 
     /** The current segment used to compute the output. */
@@ -140,7 +140,7 @@ constructor(
                         impl.lastSpringState,
                         impl.lastSegment,
                         impl.lastAnimation,
-                        impl.isOutputFixed,
+                        impl.computedIsOutputFixed,
                     ),
                     impl.isActive,
                     impl.animationFrameDriver.isRunning,
@@ -284,7 +284,7 @@ private class ImperativeComputations(
                     currentSpringState,
                     currentValues.segment,
                     currentValues.animation,
-                    isOutputFixed,
+                    computedIsOutputFixed,
                 )
         }
 
@@ -300,7 +300,7 @@ private class ImperativeComputations(
             directMappedVelocity = 0f
         }
 
-        var isAnimationFinished = isStable
+        var isAnimationFinished = computedIsStable
         if (lastSegment != currentValues.segment) {
             lastSegment = currentValues.segment
             isAnimationFinished = false

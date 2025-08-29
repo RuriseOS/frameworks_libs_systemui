@@ -29,8 +29,6 @@ import com.android.mechanics.ManagedMotionValue
 import com.android.mechanics.MotionValueCollection
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.MotionSpec
-import com.android.mechanics.testing.ComposeMotionValueToolkit.createTimeSeries
-import com.android.mechanics.testing.MotionValueToolkit.Companion.FrameDuration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -111,6 +109,7 @@ object ComposeMotionValueCollectionToolkit :
         val frameIds = mutableListOf<FrameId>()
 
         fun recordFrame(frameId: TimestampFrameId) {
+
             frameIds.add(frameId)
 
             collectionCapture.captureCurrentFrame {

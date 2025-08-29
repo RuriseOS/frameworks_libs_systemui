@@ -51,6 +51,9 @@ sealed interface ManagedMotionValue : MotionValueState, DisposableHandle
  * A collection of motion values that all share the same input and gesture context.
  *
  * All [ManagedMotionValue]s are run from the same [keepRunning], and share the same lifecycle.
+ *
+ * Input, gesture context and spec are updated all at once, at the beginning of the, during
+ * [withFrameNanos].
  */
 class MotionValueCollection(
     internal val input: () -> Float,
@@ -86,6 +89,8 @@ class MotionValueCollection(
             // These `captured*` values will be applied to the `last*` values, at the beginning
             // of the each new frame.
             // TODO(b/397837971): Encapsulate the state in a StateRecord.
+            // TODO(b/397837971): last/current values could all be updated at the beginning of the
+            // frame, when latching.
             var capturedFrameTimeNanos = currentAnimationTimeNanos
             var capturedInput = currentInput
             var capturedGestureDragOffset = currentGestureDragOffset
@@ -128,7 +133,9 @@ class MotionValueCollection(
                         lastInput = capturedInput
                         lastGestureDragOffset = capturedGestureDragOffset
 
-                        // TODO - capture input
+                        currentInput = input.invoke()
+                        currentDirection = gestureContext.direction
+                        currentGestureDragOffset = gestureContext.dragOffset
 
                         activeComputations.forEach { it.onFrameStart() }
                     }
@@ -183,9 +190,9 @@ class MotionValueCollection(
                                 hasComputations &&
                                     (activeComputations != managedComputations ||
                                         activeComputations.any { it.wantWakeup() } ||
-                                        currentInput != capturedInput ||
-                                        currentDirection != capturedDirection ||
-                                        currentGestureDragOffset != capturedGestureDragOffset)
+                                        input.invoke() != capturedInput ||
+                                        gestureContext.direction != capturedDirection ||
+                                        gestureContext.dragOffset != capturedGestureDragOffset)
                             wakeup
                         }
                         .first { it }
@@ -201,20 +208,20 @@ class MotionValueCollection(
     }
 
     // ---- Implementation - State shared with all ManagedMotionComputations  ----------------------
-
+    // Note that all this state is updated exactly once per frame, during [withFrameNanos].
     internal var currentAnimationTimeNanos by mutableLongStateOf(-1L)
 
     @VisibleForTesting
-    val currentInput: Float
-        get() = input.invoke()
+    var currentInput: Float by mutableFloatStateOf(input.invoke())
+        private set
 
     @VisibleForTesting
-    val currentDirection: InputDirection
-        get() = gestureContext.direction
+    var currentDirection: InputDirection by mutableStateOf(gestureContext.direction)
+        private set
 
     @VisibleForTesting
-    val currentGestureDragOffset: Float
-        get() = gestureContext.dragOffset
+    var currentGestureDragOffset: Float by mutableFloatStateOf(gestureContext.dragOffset)
+        private set
 
     internal var lastFrameTimeNanos by mutableLongStateOf(-1L)
     internal var lastInput by mutableFloatStateOf(currentInput)
@@ -259,10 +266,24 @@ internal class ManagedMotionComputation(
 
     // ----  ManagedMotionValue --------------------------------------------------------------------
 
+    override var output: Float by mutableFloatStateOf(Float.NaN)
+
+    /**
+     * [output] value, but without animations.
+     *
+     * This value always reports the target value, even before a animation is finished.
+     *
+     * While [isStable], [outputTarget] and [output] are the same value.
+     */
+    override var outputTarget: Float by mutableFloatStateOf(Float.NaN)
+
+    /** Whether an animation is currently running. */
+    override var isStable: Boolean by mutableStateOf(false)
+
     override val spec
         get() = specProvider.invoke()
 
-    override fun <T> get(key: SemanticKey<T>): T? = semanticState(key)
+    override fun <T> get(key: SemanticKey<T>): T? = computedSemanticState(key)
 
     override val segmentKey: SegmentKey
         get() = currentComputedValues.segment.key
@@ -286,7 +307,7 @@ internal class ManagedMotionComputation(
                         lastSpringState,
                         lastSegment,
                         lastAnimation,
-                        isOutputFixed,
+                        computedIsOutputFixed,
                     ),
                     owner.isActive,
                     owner.isAnimating,
@@ -392,6 +413,10 @@ internal class ManagedMotionComputation(
         lastGuaranteeState = capturedGuaranteeState
         lastAnimation = capturedAnimation
         lastSpringState = capturedSpringState
+
+        output = computedOutput
+        outputTarget = computedOutputTarget
+        isStable = computedIsStable
     }
 
     fun onFrameEnd(isAnimatingUninterrupted: Boolean): Boolean {
@@ -436,7 +461,7 @@ internal class ManagedMotionComputation(
                     capturedSpringState,
                     capturedSegment,
                     capturedAnimation,
-                    isOutputFixed,
+                    computedIsOutputFixed,
                 )
         }
 

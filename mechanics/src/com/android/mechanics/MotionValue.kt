@@ -144,7 +144,7 @@ class MotionValue(
     @get:FrequentlyChangingValue val spec: MotionSpec by impl::spec
 
     /** Animated [output] value. */
-    @get:FrequentlyChangingValue override val output: Float by impl::output
+    @get:FrequentlyChangingValue override val output: Float by impl::computedOutput
 
     /**
      * [output] value, but without animations.
@@ -154,14 +154,14 @@ class MotionValue(
      * While [isStable], [outputTarget] and [output] are the same value.
      */
     // TODO(b/441041846): This should not change frequently
-    @get:FrequentlyChangingValue override val outputTarget: Float by impl::outputTarget
+    @get:FrequentlyChangingValue override val outputTarget: Float by impl::computedOutputTarget
 
     /** The [output] exposed as [FloatState]. */
-    @get:FrequentlyChangingValue override val floatValue: Float by impl::output
+    @get:FrequentlyChangingValue override val floatValue: Float by impl::computedOutput
 
     /** Whether an animation is currently running. */
     // TODO(b/441041846): This should not change frequently
-    @get:FrequentlyChangingValue override val isStable: Boolean by impl::isStable
+    @get:FrequentlyChangingValue override val isStable: Boolean by impl::computedIsStable
 
     /**
      * Whether the output can change its value.
@@ -172,7 +172,7 @@ class MotionValue(
      * changes. This can be used to avoid unnecessary work like recomposition or re-measurement.
      */
     // TODO(b/441041846): This should not change frequently
-    @get:FrequentlyChangingValue val isOutputFixed: Boolean by impl::isOutputFixed
+    @get:FrequentlyChangingValue val isOutputFixed: Boolean by impl::computedIsOutputFixed
 
     /**
      * The current value for the [SemanticKey].
@@ -182,7 +182,7 @@ class MotionValue(
     // TODO(b/441041846): This should not change frequently
     @FrequentlyChangingValue
     override operator fun <T> get(key: SemanticKey<T>): T? {
-        return impl.semanticState(key)
+        return impl.computedSemanticState(key)
     }
 
     /** The current segment used to compute the output. */
@@ -273,7 +273,7 @@ class MotionValue(
                         impl.lastSpringState,
                         impl.lastSegment,
                         impl.lastAnimation,
-                        impl.isOutputFixed,
+                        impl.computedIsOutputFixed,
                     ),
                     impl.isActive,
                     impl.debugIsAnimating,
@@ -458,7 +458,7 @@ private class ObservableComputations(
                             capturedSpringState,
                             capturedSegment,
                             capturedAnimation,
-                            isOutputFixed,
+                            computedIsOutputFixed,
                         )
                 }
 

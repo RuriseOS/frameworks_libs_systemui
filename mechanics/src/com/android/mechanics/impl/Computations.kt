@@ -149,15 +149,15 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                 lastSegment.spec == spec &&
                 lastSegment.isValidForInput(currentInput, currentDirection)
 
-    val output: Float
+    val computedOutput: Float
         get() =
             if (isSameSegmentAndAtRest) {
                 lastSegment.mapping.map(currentInput)
             } else {
-                outputTarget + currentSpringState.displacement
+                computedOutputTarget + currentSpringState.displacement
             }
 
-    val outputTarget: Float
+    val computedOutputTarget: Float
         get() =
             if (isSameSegmentAndAtRest) {
                 lastSegment.mapping.map(currentInput)
@@ -165,7 +165,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                 currentComputedValues.segment.mapping.map(currentInput)
             }
 
-    val isStable: Boolean
+    val computedIsStable: Boolean
         get() =
             if (isSameSegmentAndAtRest) {
                 true
@@ -180,7 +180,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
      * segment with a [Mapping.Fixed], and that mapping's value has not changed from the previous
      * frame.
      */
-    val isOutputFixed: Boolean
+    val computedIsOutputFixed: Boolean
         get() {
             if (lastSpringState != SpringState.AtRest) {
                 // The spring is still settling.
@@ -213,7 +213,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
             }
         }
 
-    fun <T> semanticState(semanticKey: SemanticKey<T>): T? {
+    fun <T> computedSemanticState(semanticKey: SemanticKey<T>): T? {
         return with(if (isSameSegmentAndAtRest) lastSegment else currentComputedValues.segment) {
             spec.semanticState(semanticKey, key)
         }

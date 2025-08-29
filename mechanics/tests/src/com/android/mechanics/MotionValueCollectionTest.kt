@@ -32,7 +32,6 @@ import com.android.mechanics.testing.VerifyTimeSeriesResult
 import com.android.mechanics.testing.animateValueTo
 import com.android.mechanics.testing.goldenTest
 import com.android.mechanics.testing.nullableDataPoints
-import com.android.mechanics.testing.output
 import com.android.mechanics.testing.whenActive
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule

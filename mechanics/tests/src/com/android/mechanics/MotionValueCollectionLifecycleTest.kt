@@ -22,7 +22,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.mechanics.MotionValueTest.Companion.FakeGestureContext
+import com.android.mechanics.spec.InputDirection
+import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
+import com.android.mechanics.spec.builder.MotionBuilderContext
+import com.android.mechanics.spec.builder.directionalMotionSpec
+import com.android.mechanics.spec.builder.fixedSpatialValueSpec
+import com.android.mechanics.testing.FakeMotionSpecBuilderContext
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -30,7 +36,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class MotionValueCollectionLifecycleTest {
+class MotionValueCollectionLifecycleTest :
+    MotionBuilderContext by FakeMotionSpecBuilderContext.Default {
 
     @get:Rule(order = 0) val rule = createComposeRule()
 
@@ -216,5 +223,82 @@ class MotionValueCollectionLifecycleTest {
         assertThat(underTest.isActive).isFalse()
         assertThat(inspector.isActive).isFalse()
         assertThat(underTest.activeComputationCount).isEqualTo(0)
+    }
+
+    @Test
+    fun latchesInput_changesAreProcessedOnFrameStartOnly() = runTest {
+        val input = mutableFloatStateOf(0f)
+
+        val underTest = MotionValueCollection(input::value, FakeGestureContext)
+        val motionValue = underTest.create({ MotionSpec.Identity })
+
+        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
+
+        rule.awaitIdle()
+
+        rule.mainClock.autoAdvance = false
+
+        assertThat(motionValue.output).isEqualTo(0f)
+        input.floatValue = 1f
+        assertThat(motionValue.output).isEqualTo(0f)
+
+        rule.mainClock.advanceTimeByFrame()
+        rule.awaitIdle()
+        assertThat(motionValue.output).isEqualTo(1f)
+    }
+
+    @Test
+    fun latchesGestureContext_changesAreProcessedOnFrameStartOnly() = runTest {
+        val gestureContext = ProvidedGestureContext(0f, InputDirection.Max)
+        val spec =
+            MotionSpec(
+                maxDirection = directionalMotionSpec(Mapping.Zero),
+                minDirection = directionalMotionSpec(Mapping.One),
+            )
+
+        val underTest = MotionValueCollection({ 0f }, gestureContext)
+        val motionValue = underTest.create({ spec })
+
+        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
+
+        rule.awaitIdle()
+
+        rule.mainClock.autoAdvance = false
+
+        assertThat(motionValue.output).isEqualTo(0f)
+        gestureContext.direction = InputDirection.Min
+        assertThat(motionValue.output).isEqualTo(0f)
+
+        rule.mainClock.advanceTimeByFrame()
+        rule.awaitIdle()
+
+        // Note: Animation is not expected here, since the segmentKey is in both directions
+        // [minLimit,maxLimit].
+        assertThat(motionValue.output).isEqualTo(1f)
+    }
+
+    @Test
+    fun latchesSpec_changesAreProcessedOnFrameStartOnly() = runTest {
+        val spec = mutableStateOf(fixedSpatialValueSpec(0f))
+
+        val underTest = MotionValueCollection({ 0f }, FakeGestureContext)
+        val motionValue = underTest.create(spec::value)
+
+        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
+
+        rule.awaitIdle()
+
+        rule.mainClock.autoAdvance = false
+
+        assertThat(motionValue.output).isEqualTo(0f)
+        spec.value = fixedSpatialValueSpec(1f)
+        assertThat(motionValue.output).isEqualTo(0f)
+
+        rule.mainClock.advanceTimeByFrame()
+        rule.awaitIdle()
+
+        // Note: Animation is not expected here, since the segmentKey is in both directions
+        // [minLimit,maxLimit].
+        assertThat(motionValue.output).isEqualTo(1f)
     }
 }
