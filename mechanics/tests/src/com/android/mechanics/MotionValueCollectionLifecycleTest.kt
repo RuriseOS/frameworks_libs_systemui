@@ -69,18 +69,52 @@ class MotionValueCollectionLifecycleTest :
     }
 
     @Test
-    fun keepRunning_activatesExisting() = runTest {
+    fun create_withoutKeepRunning_remainsInactive() = runTest {
+        val input = mutableFloatStateOf(1f)
+        val underTest = MotionValueCollection(input::value, FakeGestureContext)
+
+        rule.setContent {}
+
+        assertThat(underTest.isActive).isFalse()
+
+        val motionValue = underTest.create({ MotionSpec.Identity })
+        assertThat(motionValue.output).isNaN()
+        val inspector = motionValue.debugInspector()
+        assertThat(inspector.isActive).isFalse()
+    }
+
+    @Test
+    fun create_whileKeepRunning_isActivatedImmediately() = runTest {
+        val input = mutableFloatStateOf(1f)
+        val underTest = MotionValueCollection(input::value, FakeGestureContext)
+
+        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
+        rule.awaitIdle()
+
+        assertThat(underTest.isActive).isTrue()
+        assertThat(underTest.managedMotionValues.size).isEqualTo(0)
+
+        val motionValue = underTest.create({ MotionSpec.Identity })
+        assertThat(motionValue.output).isEqualTo(1f)
+        val inspector = motionValue.debugInspector()
+        assertThat(inspector.isActive).isTrue()
+    }
+
+    @Test
+    fun keepRunning_activatesAlreadyCreated() = runTest {
         val input = mutableFloatStateOf(0f)
         val underTest = MotionValueCollection(input::value, FakeGestureContext)
 
-        val inspector = underTest.create({ MotionSpec.Identity }).debugInspector()
+        val motionValue = underTest.create({ MotionSpec.Identity })
+        val inspector = motionValue.debugInspector()
 
         assertThat(underTest.frameCount).isEqualTo(0)
         assertThat(underTest.isActive).isFalse()
         assertThat(underTest.isAnimating).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
         assertThat(inspector.isActive).isFalse()
         assertThat(inspector.isAnimating).isFalse()
+        assertThat(motionValue.output).isNaN()
 
         rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
 
@@ -89,9 +123,10 @@ class MotionValueCollectionLifecycleTest :
         assertThat(underTest.frameCount).isEqualTo(1)
         assertThat(underTest.isActive).isTrue()
         assertThat(underTest.isAnimating).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(1)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
         assertThat(inspector.isActive).isTrue()
         assertThat(inspector.isAnimating).isFalse()
+        assertThat(motionValue.output).isFinite()
     }
 
     @Test
@@ -109,7 +144,7 @@ class MotionValueCollectionLifecycleTest :
         assertThat(underTest.frameCount).isEqualTo(1)
         assertThat(underTest.isActive).isTrue()
         assertThat(underTest.isAnimating).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(1)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
         assertThat(inspector.isActive).isTrue()
         assertThat(inspector.isAnimating).isFalse()
 
@@ -119,7 +154,7 @@ class MotionValueCollectionLifecycleTest :
         assertThat(underTest.frameCount).isEqualTo(2)
         assertThat(underTest.isActive).isTrue()
         assertThat(underTest.isAnimating).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(0)
         assertThat(inspector.isActive).isFalse()
         assertThat(inspector.isAnimating).isFalse()
     }
@@ -138,32 +173,14 @@ class MotionValueCollectionLifecycleTest :
 
         assertThat(underTest.isActive).isFalse()
         assertThat(inspector.isActive).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
 
         motionValue.dispose()
         rule.awaitIdle()
 
         assertThat(underTest.isActive).isFalse()
         assertThat(inspector.isActive).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
-    }
-
-    @Test
-    fun keepRunning_activatesNew() = runTest {
-        val input = mutableFloatStateOf(0f)
-        val underTest = MotionValueCollection(input::value, FakeGestureContext)
-
-        rule.setContent { LaunchedEffect(Unit) { underTest.keepRunning() } }
-        rule.awaitIdle()
-
-        assertThat(underTest.isActive).isTrue()
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
-
-        val inspector = underTest.create({ MotionSpec.Identity }).debugInspector()
-        rule.awaitIdle()
-
-        assertThat(underTest.activeComputationCount).isEqualTo(1)
-        assertThat(inspector.isActive).isTrue()
+        assertThat(underTest.managedMotionValues.size).isEqualTo(0)
     }
 
     @Test
@@ -180,21 +197,21 @@ class MotionValueCollectionLifecycleTest :
         rule.awaitIdle()
 
         assertThat(underTest.isActive).isTrue()
-        assertThat(underTest.activeComputationCount).isEqualTo(2)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(2)
         assertThat(inspector1.isActive).isTrue()
         assertThat(inspector2.isActive).isTrue()
 
         mv1.dispose()
         rule.awaitIdle()
 
-        assertThat(underTest.activeComputationCount).isEqualTo(1)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
         assertThat(inspector1.isActive).isFalse()
         assertThat(inspector2.isActive).isTrue()
 
         mv2.dispose()
         rule.awaitIdle()
 
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(0)
         assertThat(inspector1.isActive).isFalse()
         assertThat(inspector2.isActive).isFalse()
     }
@@ -215,14 +232,14 @@ class MotionValueCollectionLifecycleTest :
 
         assertThat(underTest.isActive).isTrue()
         assertThat(inspector.isActive).isTrue()
-        assertThat(underTest.activeComputationCount).isEqualTo(1)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
 
         keepRunning.value = false
         rule.awaitIdle()
 
         assertThat(underTest.isActive).isFalse()
         assertThat(inspector.isActive).isFalse()
-        assertThat(underTest.activeComputationCount).isEqualTo(0)
+        assertThat(underTest.managedMotionValues.size).isEqualTo(1)
     }
 
     @Test
