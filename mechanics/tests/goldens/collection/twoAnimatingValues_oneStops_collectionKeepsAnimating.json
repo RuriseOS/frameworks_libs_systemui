@@ -1,0 +1,198 @@
+{
+  "frame_ids": [
+    0,
+    16,
+    32,
+    48,
+    64,
+    80,
+    96,
+    112,
+    128,
+    144,
+    160,
+    176
+  ],
+  "features": [
+    {
+      "name": "input",
+      "type": "float",
+      "data_points": [
+        0,
+        0.6,
+        1.2,
+        1.8000001,
+        2.4,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "name": "gestureDirection",
+      "type": "string",
+      "data_points": [
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max",
+        "Max"
+      ]
+    },
+    {
+      "name": "primary-output",
+      "type": "float",
+      "data_points": [
+        0,
+        0,
+        0.009148657,
+        0.11382812,
+        0.27218753,
+        0.43603384,
+        0.58219516,
+        0.70204157,
+        0.7947967,
+        0.8634457,
+        0.91236067,
+        1
+      ]
+    },
+    {
+      "name": "primary-outputTarget",
+      "type": "float",
+      "data_points": [
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "primary-isStable",
+      "type": "boolean",
+      "data_points": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    },
+    {
+      "name": "primary-isAnimating",
+      "type": "boolean",
+      "data_points": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "name": "second-output",
+      "type": "float",
+      "data_points": [
+        0,
+        0,
+        0,
+        0,
+        0.3957839,
+        0.8722446,
+        1.2746727,
+        1.5661739,
+        1.7578185,
+        1.8746462,
+        2,
+        2
+      ]
+    },
+    {
+      "name": "second-outputTarget",
+      "type": "float",
+      "data_points": [
+        0,
+        0,
+        0,
+        0,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "name": "second-isStable",
+      "type": "boolean",
+      "data_points": [
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    },
+    {
+      "name": "second-isAnimating",
+      "type": "boolean",
+      "data_points": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  ]
+}
