@@ -129,7 +129,7 @@ class MotionValue(
     spec: () -> MotionSpec,
     label: String? = null,
     stableThreshold: Float = StableThresholdEffect,
-) : FloatState {
+) : MotionValueState {
     private val impl =
         ObservableComputations(
             inputProvider = input,
@@ -144,7 +144,7 @@ class MotionValue(
     @get:FrequentlyChangingValue val spec: MotionSpec by impl::spec
 
     /** Animated [output] value. */
-    @get:FrequentlyChangingValue val output: Float by impl::output
+    @get:FrequentlyChangingValue override val output: Float by impl::computedOutput
 
     /**
      * [output] value, but without animations.
@@ -154,14 +154,14 @@ class MotionValue(
      * While [isStable], [outputTarget] and [output] are the same value.
      */
     // TODO(b/441041846): This should not change frequently
-    @get:FrequentlyChangingValue val outputTarget: Float by impl::outputTarget
+    @get:FrequentlyChangingValue override val outputTarget: Float by impl::computedOutputTarget
 
     /** The [output] exposed as [FloatState]. */
-    @get:FrequentlyChangingValue override val floatValue: Float by impl::output
+    @get:FrequentlyChangingValue override val floatValue: Float by impl::computedOutput
 
     /** Whether an animation is currently running. */
     // TODO(b/441041846): This should not change frequently
-    @get:FrequentlyChangingValue val isStable: Boolean by impl::isStable
+    @get:FrequentlyChangingValue override val isStable: Boolean by impl::computedIsStable
 
     /**
      * Whether the output can change its value.
@@ -172,7 +172,7 @@ class MotionValue(
      * changes. This can be used to avoid unnecessary work like recomposition or re-measurement.
      */
     // TODO(b/441041846): This should not change frequently
-    @get:FrequentlyChangingValue val isOutputFixed: Boolean by impl::isOutputFixed
+    @get:FrequentlyChangingValue val isOutputFixed: Boolean by impl::computedIsOutputFixed
 
     /**
      * The current value for the [SemanticKey].
@@ -181,14 +181,14 @@ class MotionValue(
      */
     // TODO(b/441041846): This should not change frequently
     @FrequentlyChangingValue
-    operator fun <T> get(key: SemanticKey<T>): T? {
-        return impl.semanticState(key)
+    override operator fun <T> get(key: SemanticKey<T>): T? {
+        return impl.computedSemanticState(key)
     }
 
     /** The current segment used to compute the output. */
     // TODO(b/441041846): This should not change frequently
     @get:FrequentlyChangingValue
-    val segmentKey: SegmentKey
+    override val segmentKey: SegmentKey
         get() = impl.currentComputedValues.segment.key
 
     /**
@@ -223,7 +223,7 @@ class MotionValue(
             impl.keepRunning { continueRunning.invoke(this@MotionValue) }
         }
 
-    val label: String? by impl::label
+    override val label: String? by impl::label
 
     companion object {
         /** Creates a [MotionValue] whose [currentInput] is the animated [output] of [source]. */
@@ -261,7 +261,7 @@ class MotionValue(
      *
      * The returned [DebugInspector] must be [DebugInspector.dispose]d when no longer needed.
      */
-    fun debugInspector(): DebugInspector {
+    override fun debugInspector(): DebugInspector {
         if (debugInspectorRefCount.getAndIncrement() == 0) {
             impl.debugInspector =
                 DebugInspector(
@@ -273,7 +273,7 @@ class MotionValue(
                         impl.lastSpringState,
                         impl.lastSegment,
                         impl.lastAnimation,
-                        impl.isOutputFixed,
+                        impl.computedIsOutputFixed,
                     ),
                     impl.isActive,
                     impl.debugIsAnimating,
@@ -458,7 +458,7 @@ private class ObservableComputations(
                             capturedSpringState,
                             capturedSegment,
                             capturedAnimation,
-                            isOutputFixed,
+                            computedIsOutputFixed,
                         )
                 }
 
