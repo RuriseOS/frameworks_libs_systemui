@@ -70,7 +70,12 @@ class MotionValueCollection(
      * [MotionValueCollection] is kept active.
      */
     fun create(spec: () -> MotionSpec, label: String? = null): ManagedMotionValue {
-        return ManagedMotionComputation(this, spec, label).also { managedComputations.add(it) }
+        return ManagedMotionComputation(this, spec, label).also {
+            if (isActive) {
+                it.onActivate()
+            }
+            managedComputations.add(it)
+        }
     }
 
     /**
@@ -96,12 +101,7 @@ class MotionValueCollection(
             var capturedGestureDragOffset = currentGestureDragOffset
             var capturedDirection = currentDirection
 
-            val activeComputations = mutableSetOf<ManagedMotionComputation>()
-            managedComputations.forEach {
-                it.onActivate()
-                activeComputations.add(it)
-            }
-            activeComputationCount = activeComputations.size
+            managedComputations.forEach { it.onActivate() }
 
             try {
                 isAnimating = true
@@ -115,17 +115,6 @@ class MotionValueCollection(
                 while (true) {
 
                     withFrameNanos { frameTimeNanos ->
-                        val addedComputations = managedComputations - activeComputations
-                        val removedComputations = activeComputations - managedComputations
-                        addedComputations.forEach {
-                            it.onActivate()
-                            activeComputations.add(it)
-                        }
-                        removedComputations.forEach {
-                            it.onDeactivate()
-                            activeComputations.remove(it)
-                        }
-                        activeComputationCount = activeComputations.size
                         frameCount++
 
                         currentAnimationTimeNanos = frameTimeNanos
@@ -137,7 +126,7 @@ class MotionValueCollection(
                         currentDirection = gestureContext.direction
                         currentGestureDragOffset = gestureContext.dragOffset
 
-                        activeComputations.forEach { it.onFrameStart() }
+                        managedComputations.forEach { it.onFrameStart() }
                     }
 
                     // At this point, the complete frame is done (including layout, drawing and
@@ -152,7 +141,7 @@ class MotionValueCollection(
                     // re-computation if the current state is being read before the next frame).
 
                     var scheduleNextFrame = false
-                    activeComputations.forEach {
+                    managedComputations.forEach {
                         if (it.onFrameEnd(isAnimatingUninterrupted)) {
                             scheduleNextFrame = true
                         }
@@ -181,7 +170,9 @@ class MotionValueCollection(
                     }
 
                     isAnimating = false
-                    activeComputations.forEach { it.debugInspector?.isAnimating = false }
+                    managedComputations.forEach { it.debugInspector?.isAnimating = false }
+                    val activeComputations = managedComputations.toSet()
+
                     snapshotFlow {
                             val hasComputations =
                                 activeComputations.isNotEmpty() || managedComputations.isNotEmpty()
@@ -197,12 +188,11 @@ class MotionValueCollection(
                         }
                         .first { it }
                     isAnimating = true
-                    activeComputations.forEach { it.debugInspector?.isAnimating = true }
+                    managedComputations.forEach { it.debugInspector?.isAnimating = true }
                 }
             } finally {
                 isActive = false
-                activeComputations.forEach { it.onDeactivate() }
-                activeComputationCount = 0
+                managedComputations.forEach { it.onDeactivate() }
             }
         }
     }
@@ -242,16 +232,13 @@ class MotionValueCollection(
         private set
 
     @VisibleForTesting
-    var activeComputationCount = 0
-        private set
-
-    @VisibleForTesting
     // Note - this is public so that its accessible by the mechanics:testing library
     val managedMotionValues: Set<ManagedMotionValue>
         get() = managedComputations
 
     internal fun onDispose(toDispose: ManagedMotionComputation) {
         managedComputations.remove(toDispose)
+        toDispose.onDeactivate()
     }
 }
 
@@ -398,6 +385,8 @@ internal class ManagedMotionComputation(
         capturedGuaranteeState = currentComputedValues.guarantee
         capturedAnimation = currentComputedValues.animation
         capturedSpringState = currentSpringState
+
+        onFrameStart()
 
         debugInspector?.isAnimating = true
         debugInspector?.isActive = true
