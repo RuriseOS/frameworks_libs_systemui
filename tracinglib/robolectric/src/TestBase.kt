@@ -53,6 +53,7 @@ import org.junit.ClassRule
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemProperties
 
 class InvalidTraceStateException(message: String, cause: Throwable? = null) :
     AssertionError(message, cause)
@@ -64,7 +65,7 @@ internal val bgThread3 = newSingleThreadContext("test-bg-3")
 internal val bgThread4 = newSingleThreadContext("test-bg-4")
 
 @RunWith(AndroidJUnit4::class)
-@Config(shadows = [ShadowTrace::class])
+@Config(shadows = [ShadowTrace::class, ShadowSystemProperties::class])
 abstract class TestBase {
     companion object {
         @JvmField
@@ -102,6 +103,14 @@ abstract class TestBase {
 
     @Before
     fun setup() {
+        ShadowSystemProperties.reset()
+        ShadowSystemProperties.override("persist.debug.coroutine_tracing", "true")
+        ShadowSystemProperties.override("persist.debug.coroutine_tracing.walk_stack", "false")
+        ShadowSystemProperties.override(
+            "persist.debug.coroutine_tracing.count_continuations",
+            "false",
+        )
+
         FakeTraceState.isTracingEnabled = true
         FakeTraceState.clearAll()
 
@@ -340,11 +349,11 @@ abstract class TestBase {
             else
                 ", expected event ${expectedEventNumber.prettyPrintList()}, actual event #$actualEventNumber"
         return """
-                Incorrect trace$locationMarker. $extraMessage
-                  Expected : {${expectedOpenTraceSections.prettyPrintList()}}
-                  Actual   : {${actualOpenSections.prettyPrintList()}}
-                """
-            .trimIndent()
+               Incorrect trace$locationMarker. $extraMessage
+                 Expected : {${expectedOpenTraceSections.prettyPrintList()}}
+                 Actual   : {${actualOpenSections.prettyPrintList()}}
+               """
+                   .trimIndent()
     }
 
     private fun checkFinalEvent(expectedEvent: Int): Int {
