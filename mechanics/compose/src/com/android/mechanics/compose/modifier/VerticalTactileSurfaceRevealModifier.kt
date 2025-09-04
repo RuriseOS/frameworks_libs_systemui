@@ -91,9 +91,9 @@ private data class VerticalTactileSurfaceRevealElement(
         )
 
     override fun update(node: VerticalTactileSurfaceRevealNode) {
+        check(node.deltaY == deltaY) { "Cannot update deltaY from ${node.deltaY} to $deltaY" }
         node.update(
             motionBuilderContext = motionBuilderContext,
-            deltaY = deltaY,
             revealOnThreshold = revealOnThreshold,
         )
     }
@@ -108,30 +108,33 @@ private data class VerticalTactileSurfaceRevealElement(
 
 private class VerticalTactileSurfaceRevealNode(
     private var motionBuilderContext: MotionBuilderContext,
-    deltaY: Float,
+    val deltaY: Float,
     private var revealOnThreshold: RevealOnThreshold,
     private val label: String?,
 ) : DelegatingNode(), ApproachLayoutModifierNode {
+    // These properties are calculated during the lookahead pass (`lookAheadMeasure`) to
+    // orchestrate the reveal animation. They are guaranteed to be updated before `approachMeasure`
+    // is called.
     private var lookAheadHeight by mutableFloatStateOf(Float.NaN)
-    private var layoutOffsetY by mutableFloatStateOf(0f)
-    private var deltaY: Float by mutableFloatStateOf(deltaY)
-
-    private lateinit var motionDriver: MotionDriver
-    // Created after the first lookahead measure, guaranteed to be created before first measure
+    private var layoutOffsetY by mutableFloatStateOf(Float.NaN)
+    // Created lazily upon first lookahead and disposed in `onDetach`.
     private var revealHeight: ManagedMotionValue? = null
 
-    fun update(
-        motionBuilderContext: MotionBuilderContext,
-        deltaY: Float,
-        revealOnThreshold: RevealOnThreshold,
-    ) {
-        this.motionBuilderContext = motionBuilderContext
-        this.deltaY = deltaY
-        this.revealOnThreshold = revealOnThreshold
-    }
+    /**
+     * The [MotionDriver] that controls the parent's motion, used to determine the reveal
+     * animation's progress.
+     *
+     * It is initialized in `onAttach` and is safe to use in all subsequent measure passes.
+     */
+    private lateinit var motionDriver: MotionDriver
 
     override fun onAttach() {
         motionDriver = findMotionDriver()
+    }
+
+    fun update(motionBuilderContext: MotionBuilderContext, revealOnThreshold: RevealOnThreshold) {
+        this.motionBuilderContext = motionBuilderContext
+        this.revealOnThreshold = revealOnThreshold
     }
 
     override fun onDetach() {
@@ -144,10 +147,12 @@ private class VerticalTactileSurfaceRevealNode(
                 motionBuilderContext.fixedSpatialValueSpec(0f)
             }
             MotionDriver.State.Transition -> {
+                // Cache the state read to avoid the performance cost of accessing it twice.
+                val start = layoutOffsetY
                 motionBuilderContext.spatialMotionSpec(Mapping.Zero) {
                     between(
-                        start = layoutOffsetY + deltaY,
-                        end = layoutOffsetY + deltaY + lookAheadHeight,
+                        start = start,
+                        end = start + lookAheadHeight,
                         effect = revealOnThreshold,
                     )
                 }
@@ -176,17 +181,19 @@ private class VerticalTactileSurfaceRevealNode(
         val placeable = measurable.measure(constraints)
         val targetHeight = placeable.height.toFloat()
         lookAheadHeight = targetHeight
-        if (revealHeight == null) {
-            val maxHeightDriven =
-                motionDriver.maxHeightDriven(
-                    spec = derivedStateOf(::spec)::value,
-                    label = "TactileSurfaceReveal(${label.orEmpty()})",
-                )
-            revealHeight = maxHeightDriven
-            delegate(DebugMotionValueNode(maxHeightDriven))
-        }
         return layout(placeable.width, placeable.height) {
-            layoutOffsetY = with(motionDriver) { driverOffset() }.y
+            layoutOffsetY = with(motionDriver) { driverOffset() }.y + deltaY
+
+            if (revealHeight == null) {
+                val maxHeightDriven =
+                    motionDriver.maxHeightDriven(
+                        spec = derivedStateOf(::spec)::value,
+                        label = "TactileSurfaceReveal(${label.orEmpty()})",
+                    )
+                revealHeight = maxHeightDriven
+                delegate(DebugMotionValueNode(maxHeightDriven))
+            }
+
             placeable.place(IntOffset.Zero)
         }
     }

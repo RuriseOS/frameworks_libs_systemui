@@ -74,7 +74,8 @@ private data class FadeContentRevealElement(
         )
 
     override fun update(node: FadeContentRevealNode) {
-        node.update(motionBuilderContext = motionBuilderContext, deltaY = deltaY)
+        check(node.deltaY == deltaY) { "Cannot update deltaY from ${node.deltaY} to $deltaY" }
+        node.update(motionBuilderContext = motionBuilderContext)
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -86,24 +87,31 @@ private data class FadeContentRevealElement(
 
 private class FadeContentRevealNode(
     private var motionBuilderContext: MotionBuilderContext,
-    deltaY: Float,
+    val deltaY: Float,
     private val label: String?,
 ) : DelegatingNode(), ApproachLayoutModifierNode {
+    // These properties are calculated during the lookahead pass (`lookAheadMeasure`) to
+    // orchestrate the reveal animation. They are guaranteed to be updated before `approachMeasure`
+    // is called.
     private var lookAheadHeight by mutableFloatStateOf(Float.NaN)
-    private var layoutOffsetY by mutableFloatStateOf(0f)
-    private var deltaY: Float by mutableFloatStateOf(deltaY)
-
-    private lateinit var motionDriver: MotionDriver
-    // Created after the first lookahead measure, guaranteed to be created before first measure
+    private var layoutOffsetY by mutableFloatStateOf(Float.NaN)
+    // Created lazily upon first lookahead and disposed in `onDetach`.
     private var revealAlpha: ManagedMotionValue? = null
 
-    fun update(motionBuilderContext: MotionBuilderContext, deltaY: Float) {
-        this.motionBuilderContext = motionBuilderContext
-        this.deltaY = deltaY
-    }
+    /**
+     * The [MotionDriver] that controls the parent's motion, used to determine the reveal
+     * animation's progress.
+     *
+     * It is initialized in `onAttach` and is safe to use in all subsequent measure passes.
+     */
+    private lateinit var motionDriver: MotionDriver
 
     override fun onAttach() {
         motionDriver = findMotionDriver()
+    }
+
+    fun update(motionBuilderContext: MotionBuilderContext) {
+        this.motionBuilderContext = motionBuilderContext
     }
 
     override fun onDetach() {
@@ -117,7 +125,7 @@ private class FadeContentRevealNode(
             }
             MotionDriver.State.Transition -> {
                 motionBuilderContext.effectsMotionSpec(Mapping.Zero) {
-                    after(layoutOffsetY + lookAheadHeight + deltaY, FixedValue.One)
+                    after(layoutOffsetY + lookAheadHeight, FixedValue.One)
                 }
             }
             MotionDriver.State.MaxValue -> {
@@ -144,17 +152,19 @@ private class FadeContentRevealNode(
         val placeable = measurable.measure(constraints)
         val targetHeight = placeable.height.toFloat()
         lookAheadHeight = targetHeight
-        if (revealAlpha == null) {
-            val maxHeightDriven =
-                motionDriver.maxHeightDriven(
-                    spec = derivedStateOf(::spec)::value,
-                    label = "FadeContentReveal(${label.orEmpty()})",
-                )
-            revealAlpha = maxHeightDriven
-            delegate(DebugMotionValueNode(maxHeightDriven))
-        }
         return layout(placeable.width, placeable.height) {
-            layoutOffsetY = with(motionDriver) { driverOffset() }.y
+            layoutOffsetY = with(motionDriver) { driverOffset() }.y + deltaY
+
+            if (revealAlpha == null) {
+                val maxHeightDriven =
+                    motionDriver.maxHeightDriven(
+                        spec = derivedStateOf(::spec)::value,
+                        label = "FadeContentReveal(${label.orEmpty()})",
+                    )
+                revealAlpha = maxHeightDriven
+                delegate(DebugMotionValueNode(maxHeightDriven))
+            }
+
             placeable.place(IntOffset.Zero)
         }
     }
