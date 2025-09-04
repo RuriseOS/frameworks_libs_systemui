@@ -34,6 +34,7 @@ import androidx.compose.ui.layout.ApproachMeasureScope
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
@@ -48,27 +49,23 @@ import com.android.mechanics.debug.DebugMotionValueNode
 import com.android.mechanics.effects.RevealOnThreshold
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
-import com.android.mechanics.spec.builder.MotionBuilderContext
+import com.android.mechanics.spec.builder.ComposeMotionBuilderContext
 import com.android.mechanics.spec.builder.fixedSpatialValueSpec
+import com.android.mechanics.spec.builder.motionBuilderContext
 import com.android.mechanics.spec.builder.spatialMotionSpec
 import kotlin.math.roundToInt
 
 /**
  * This component remains hidden until its target height meets a minimum threshold. At that point,
  * it reveals itself by animating its height from 0 to the current target height.
- *
- * TODO: Once b/413283893 is done, [motionBuilderContext] can be read internally via
- *   CompositionLocalConsumerModifierNode, instead of passing it.
  */
 fun Modifier.verticalTactileSurfaceReveal(
-    motionBuilderContext: MotionBuilderContext,
     deltaY: Float = 0f,
     revealOnThreshold: RevealOnThreshold = DefaultRevealOnThreshold,
     label: String? = null,
 ): Modifier =
     this then
         VerticalTactileSurfaceRevealElement(
-            motionBuilderContext = motionBuilderContext,
             deltaY = deltaY,
             revealOnThreshold = revealOnThreshold,
             label = label,
@@ -77,14 +74,12 @@ fun Modifier.verticalTactileSurfaceReveal(
 private val DefaultRevealOnThreshold = RevealOnThreshold()
 
 private data class VerticalTactileSurfaceRevealElement(
-    val motionBuilderContext: MotionBuilderContext,
     val deltaY: Float,
     val revealOnThreshold: RevealOnThreshold,
     val label: String?,
 ) : ModifierNodeElement<VerticalTactileSurfaceRevealNode>() {
     override fun create(): VerticalTactileSurfaceRevealNode =
         VerticalTactileSurfaceRevealNode(
-            motionBuilderContext = motionBuilderContext,
             deltaY = deltaY,
             revealOnThreshold = revealOnThreshold,
             label = label,
@@ -92,10 +87,7 @@ private data class VerticalTactileSurfaceRevealElement(
 
     override fun update(node: VerticalTactileSurfaceRevealNode) {
         check(node.deltaY == deltaY) { "Cannot update deltaY from ${node.deltaY} to $deltaY" }
-        node.update(
-            motionBuilderContext = motionBuilderContext,
-            revealOnThreshold = revealOnThreshold,
-        )
+        node.update(revealOnThreshold = revealOnThreshold)
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -107,11 +99,10 @@ private data class VerticalTactileSurfaceRevealElement(
 }
 
 private class VerticalTactileSurfaceRevealNode(
-    private var motionBuilderContext: MotionBuilderContext,
     val deltaY: Float,
     private var revealOnThreshold: RevealOnThreshold,
     private val label: String?,
-) : DelegatingNode(), ApproachLayoutModifierNode {
+) : DelegatingNode(), ApproachLayoutModifierNode, CompositionLocalConsumerModifierNode {
     // These properties are calculated during the lookahead pass (`lookAheadMeasure`) to
     // orchestrate the reveal animation. They are guaranteed to be updated before `approachMeasure`
     // is called.
@@ -128,12 +119,14 @@ private class VerticalTactileSurfaceRevealNode(
      */
     private lateinit var motionDriver: MotionDriver
 
+    private lateinit var motionBuilderContext: ComposeMotionBuilderContext
+
     override fun onAttach() {
         motionDriver = findMotionDriver()
+        motionBuilderContext = motionBuilderContext()
     }
 
-    fun update(motionBuilderContext: MotionBuilderContext, revealOnThreshold: RevealOnThreshold) {
-        this.motionBuilderContext = motionBuilderContext
+    fun update(revealOnThreshold: RevealOnThreshold) {
         this.revealOnThreshold = revealOnThreshold
     }
 
