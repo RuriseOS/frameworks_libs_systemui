@@ -65,15 +65,12 @@ class MotionValueCollectionTest : MotionBuilderContext by FakeMotionSpecBuilderC
         goldenTest(
             spec = specBuilder(Mapping.Zero) { fixedValue(breakpoint = 1f, value = 1f) },
             createDerived = {
-                listOf(
-                    it.create(
-                        { specBuilder(Mapping.Zero) { fixedValue(breakpoint = 2f, value = 2f) } },
-                        "second",
-                    )
-                )
+                val secondSpec =
+                    specBuilder(Mapping.One) { fixedValue(breakpoint = 2f, value = 2f) }
+                listOf(it.create({ secondSpec }, "second"))
             },
         ) {
-            animateValueTo(3f)
+            animateValueTo(3f, changePerFrame = 0.5f)
             awaitStable()
         }
 

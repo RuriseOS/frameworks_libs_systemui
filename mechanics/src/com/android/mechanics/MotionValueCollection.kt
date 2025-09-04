@@ -19,10 +19,8 @@ package com.android.mechanics
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
-import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -91,15 +89,9 @@ class MotionValueCollection(
             check(!isActive) { "MotionValueCollection($label) is already running" }
             isActive = true
 
-            // These `captured*` values will be applied to the `last*` values, at the beginning
-            // of the each new frame.
-            // TODO(b/397837971): Encapsulate the state in a StateRecord.
-            // TODO(b/397837971): last/current values could all be updated at the beginning of the
-            // frame, when latching.
-            var capturedFrameTimeNanos = currentAnimationTimeNanos
-            var capturedInput = currentInput
-            var capturedGestureDragOffset = currentGestureDragOffset
-            var capturedDirection = currentDirection
+            currentInput = input.invoke()
+            currentGestureDragOffset = gestureContext.dragOffset
+            currentDirection = gestureContext.direction
 
             managedComputations.forEach { it.onActivate() }
 
@@ -113,56 +105,33 @@ class MotionValueCollection(
                 var isAnimatingUninterrupted = false
 
                 while (true) {
-
+                    var scheduleNextFrame = false
                     withFrameNanos { frameTimeNanos ->
                         frameCount++
 
-                        currentAnimationTimeNanos = frameTimeNanos
-                        lastFrameTimeNanos = capturedFrameTimeNanos
-                        lastInput = capturedInput
-                        lastGestureDragOffset = capturedGestureDragOffset
+                        lastFrameTimeNanos = currentAnimationTimeNanos
+                        lastInput = currentInput
+                        lastDirection = currentDirection
+                        lastGestureDragOffset = currentGestureDragOffset
 
+                        currentAnimationTimeNanos = frameTimeNanos
                         currentInput = input.invoke()
                         currentDirection = gestureContext.direction
                         currentGestureDragOffset = gestureContext.dragOffset
 
-                        managedComputations.forEach { it.onFrameStart() }
-                    }
-
-                    // At this point, the complete frame is done (including layout, drawing and
-                    // everything else), and this MotionValue has been updated.
-
-                    // Capture the `current*` MotionValue state, so that it can be applied as the
-                    // `last*` state when the next frame starts. Its imperative to capture at this
-                    // point
-                    // already (since the input could change before the next frame starts), while at
-                    // the
-                    // same time not already applying the `last*` state (as this would cause a
-                    // re-computation if the current state is being read before the next frame).
-
-                    var scheduleNextFrame = false
-                    managedComputations.forEach {
-                        if (it.onFrameEnd(isAnimatingUninterrupted)) {
+                        if (
+                            lastInput != currentInput ||
+                                lastDirection != currentDirection ||
+                                lastGestureDragOffset != currentGestureDragOffset
+                        ) {
                             scheduleNextFrame = true
                         }
+                        managedComputations.forEach {
+                            if (it.onFrameStart(isAnimatingUninterrupted)) {
+                                scheduleNextFrame = true
+                            }
+                        }
                     }
-
-                    if (capturedInput != currentInput) {
-                        capturedInput = currentInput
-                        scheduleNextFrame = true
-                    }
-
-                    if (capturedGestureDragOffset != currentGestureDragOffset) {
-                        capturedGestureDragOffset = currentGestureDragOffset
-                        scheduleNextFrame = true
-                    }
-
-                    if (capturedDirection != currentDirection) {
-                        capturedDirection = currentDirection
-                        scheduleNextFrame = true
-                    }
-
-                    capturedFrameTimeNanos = currentAnimationTimeNanos
 
                     isAnimatingUninterrupted = scheduleNextFrame
                     if (scheduleNextFrame) {
@@ -181,9 +150,9 @@ class MotionValueCollection(
                                 hasComputations &&
                                     (activeComputations != managedComputations ||
                                         activeComputations.any { it.wantWakeup() } ||
-                                        input.invoke() != capturedInput ||
-                                        gestureContext.direction != capturedDirection ||
-                                        gestureContext.dragOffset != capturedGestureDragOffset)
+                                        input.invoke() != currentInput ||
+                                        gestureContext.direction != currentDirection ||
+                                        gestureContext.dragOffset != currentGestureDragOffset)
                             wakeup
                         }
                         .first { it }
@@ -199,23 +168,25 @@ class MotionValueCollection(
 
     // ---- Implementation - State shared with all ManagedMotionComputations  ----------------------
     // Note that all this state is updated exactly once per frame, during [withFrameNanos].
-    internal var currentAnimationTimeNanos by mutableLongStateOf(-1L)
-
-    @VisibleForTesting
-    var currentInput: Float by mutableFloatStateOf(input.invoke())
+    internal var currentAnimationTimeNanos = -1L
         private set
 
     @VisibleForTesting
-    var currentDirection: InputDirection by mutableStateOf(gestureContext.direction)
+    var currentInput: Float = input.invoke()
         private set
 
     @VisibleForTesting
-    var currentGestureDragOffset: Float by mutableFloatStateOf(gestureContext.dragOffset)
+    var currentDirection: InputDirection = gestureContext.direction
         private set
 
-    internal var lastFrameTimeNanos by mutableLongStateOf(-1L)
-    internal var lastInput by mutableFloatStateOf(currentInput)
-    internal var lastGestureDragOffset by mutableFloatStateOf(currentGestureDragOffset)
+    @VisibleForTesting
+    var currentGestureDragOffset: Float = gestureContext.dragOffset
+        private set
+
+    internal var lastFrameTimeNanos = -1L
+    internal var lastInput = currentInput
+    internal var lastGestureDragOffset = currentGestureDragOffset
+    internal var lastDirection = currentDirection
 
     // ---- Testing related state ------------------------------------------------------------------
 
@@ -267,13 +238,16 @@ internal class ManagedMotionComputation(
     /** Whether an animation is currently running. */
     override var isStable: Boolean by mutableStateOf(false)
 
-    override val spec
-        get() = specProvider.invoke()
+    override var spec: MotionSpec = specProvider.invoke()
+        private set
 
-    override fun <T> get(key: SemanticKey<T>): T? = computedSemanticState(key)
+    override fun <T> get(key: SemanticKey<T>): T? {
+        val segment = capturedComputedValues.segment
+        return segment.spec.semanticState(key, segment.key)
+    }
 
     override val segmentKey: SegmentKey
-        get() = currentComputedValues.segment.key
+        get() = capturedComputedValues.segment.key
 
     override val floatValue: Float
         get() = output
@@ -327,36 +301,25 @@ internal class ManagedMotionComputation(
     override val currentAnimationTimeNanos
         get() = owner.currentAnimationTimeNanos
 
+    private var capturedComputedValues: ComputedValues = currentComputedValues
+    private var capturedSpringState: SpringState = currentSpringState
+
     // ----  LastFrameState ---------------------------------------------------------------------
 
-    override var lastSegment: SegmentData by
-        mutableStateOf(
-            this.spec.segmentAtInput(currentInput, currentDirection),
-            referentialEqualityPolicy(),
-        )
+    private var lastComputedValues: ComputedValues = capturedComputedValues
 
-    override var lastGuaranteeState: GuaranteeState
-        get() = GuaranteeState(_lastGuaranteeStatePacked)
-        set(value) {
-            _lastGuaranteeStatePacked = value.packedValue
-        }
+    override val lastSegment: SegmentData
+        get() = lastComputedValues.segment
 
-    private var _lastGuaranteeStatePacked: Long by
-        mutableLongStateOf(GuaranteeState.Inactive.packedValue)
+    override val lastGuaranteeState: GuaranteeState
+        get() = lastComputedValues.guarantee
 
-    override var lastAnimation: DiscontinuityAnimation by
-        mutableStateOf(DiscontinuityAnimation.None, referentialEqualityPolicy())
+    override val lastAnimation: DiscontinuityAnimation
+        get() = lastComputedValues.animation
+
+    override var lastSpringState: SpringState = SpringState.AtRest
 
     override var directMappedVelocity: Float = 0f
-
-    override var lastSpringState: SpringState
-        get() = SpringState(_lastSpringStatePacked)
-        set(value) {
-            _lastSpringStatePacked = value.packedValue
-        }
-
-    private var _lastSpringStatePacked: Long by
-        mutableLongStateOf(lastAnimation.springStartState.packedValue)
 
     override val lastFrameTimeNanos
         get() = owner.lastFrameTimeNanos
@@ -371,22 +334,13 @@ internal class ManagedMotionComputation(
 
     var debugInspector: DebugInspector? = null
 
-    // These `captured*` values will be applied to the `last*` values, at the beginning
-    // of the each new frame.
-    // TODO(b/397837971): Encapsulate the state in a StateRecord.
-    var capturedSegment = currentComputedValues.segment
-    var capturedGuaranteeState = currentComputedValues.guarantee
-    var capturedAnimation = currentComputedValues.animation
-    var capturedSpringState = currentSpringState
-
     fun onActivate() {
-        val currentComputedValues = currentComputedValues
-        capturedSegment = currentComputedValues.segment
-        capturedGuaranteeState = currentComputedValues.guarantee
-        capturedAnimation = currentComputedValues.animation
+        capturedComputedValues = currentComputedValues
         capturedSpringState = currentSpringState
+        lastComputedValues = capturedComputedValues
+        lastSpringState = capturedSpringState
 
-        onFrameStart()
+        onFrameStart(isAnimatingUninterrupted = false)
 
         debugInspector?.isAnimating = true
         debugInspector?.isActive = true
@@ -397,48 +351,28 @@ internal class ManagedMotionComputation(
         debugInspector?.isActive = false
     }
 
-    fun onFrameStart() {
-        lastSegment = capturedSegment
-        lastGuaranteeState = capturedGuaranteeState
-        lastAnimation = capturedAnimation
-        lastSpringState = capturedSpringState
+    fun onFrameStart(isAnimatingUninterrupted: Boolean): Boolean {
+        spec = specProvider.invoke()
+        if (isSameSegmentAndAtRest) {
+            outputTarget = lastSegment.mapping.map(currentInput)
+            output = outputTarget
+            isStable = true
+        } else {
+            lastComputedValues = capturedComputedValues
+            lastSpringState = capturedSpringState
 
-        output = computedOutput
-        outputTarget = computedOutputTarget
-        isStable = computedIsStable
-    }
+            capturedComputedValues = currentComputedValues
+            capturedSpringState = currentSpringState
 
-    fun onFrameEnd(isAnimatingUninterrupted: Boolean): Boolean {
+            outputTarget = capturedComputedValues.segment.mapping.map(currentInput)
+            output = outputTarget + capturedSpringState.displacement
+            isStable = capturedSpringState == SpringState.AtRest
+        }
+
         directMappedVelocity =
             if (isAnimatingUninterrupted) {
                 computeDirectMappedVelocity(currentAnimationTimeNanos - lastFrameTimeNanos)
             } else 0f
-
-        var scheduleNextFrame = false
-        if (!isSameSegmentAndAtRest) {
-            // Read currentComputedValues only once and update it, if necessary
-            val currentValues = currentComputedValues
-
-            if (capturedSegment != currentValues.segment) {
-                capturedSegment = currentValues.segment
-                scheduleNextFrame = true
-            }
-
-            if (capturedGuaranteeState != currentValues.guarantee) {
-                capturedGuaranteeState = currentValues.guarantee
-                scheduleNextFrame = true
-            }
-
-            if (capturedAnimation != currentValues.animation) {
-                capturedAnimation = currentValues.animation
-                scheduleNextFrame = true
-            }
-
-            if (capturedSpringState != currentSpringState) {
-                capturedSpringState = currentSpringState
-                scheduleNextFrame = true
-            }
-        }
 
         debugInspector?.run {
             frame =
@@ -448,16 +382,17 @@ internal class ManagedMotionComputation(
                     currentGestureDragOffset,
                     currentAnimationTimeNanos,
                     capturedSpringState,
-                    capturedSegment,
-                    capturedAnimation,
+                    capturedComputedValues.segment,
+                    capturedComputedValues.animation,
                     computedIsOutputFixed,
                 )
         }
 
-        return scheduleNextFrame
+        return lastSpringState != capturedSpringState ||
+            lastComputedValues != capturedComputedValues
     }
 
     fun wantWakeup(): Boolean {
-        return spec != capturedSegment.spec
+        return specProvider.invoke() != capturedComputedValues.segment.spec
     }
 }
