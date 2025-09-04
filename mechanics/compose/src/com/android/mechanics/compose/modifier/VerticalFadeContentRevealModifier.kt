@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastCoerceAtLeast
+import com.android.mechanics.ManagedMotionValue
+import com.android.mechanics.debug.DebugMotionValueNode
 import com.android.mechanics.effects.FixedValue
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
@@ -51,28 +53,24 @@ fun Modifier.verticalFadeContentReveal(
     motionBuilderContext: MotionBuilderContext,
     deltaY: Float = 0f,
     label: String? = null,
-    debug: Boolean = false,
 ): Modifier =
     this then
         FadeContentRevealElement(
             motionBuilderContext = motionBuilderContext,
             deltaY = deltaY,
             label = label,
-            debug = debug,
         )
 
 private data class FadeContentRevealElement(
     val motionBuilderContext: MotionBuilderContext,
     val deltaY: Float,
     val label: String?,
-    val debug: Boolean,
 ) : ModifierNodeElement<FadeContentRevealNode>() {
     override fun create(): FadeContentRevealNode =
         FadeContentRevealNode(
             motionBuilderContext = motionBuilderContext,
             deltaY = deltaY,
             label = label,
-            debug = debug,
         )
 
     override fun update(node: FadeContentRevealNode) {
@@ -83,7 +81,6 @@ private data class FadeContentRevealElement(
         name = "fadeContentReveal"
         properties["deltaY"] = deltaY
         properties["label"] = label
-        properties["debug"] = debug
     }
 }
 
@@ -91,14 +88,14 @@ private class FadeContentRevealNode(
     private var motionBuilderContext: MotionBuilderContext,
     deltaY: Float,
     private val label: String?,
-    private val debug: Boolean,
 ) : DelegatingNode(), ApproachLayoutModifierNode {
-    private var lookAheadHeight by mutableFloatStateOf(0f)
+    private var lookAheadHeight by mutableFloatStateOf(Float.NaN)
     private var layoutOffsetY by mutableFloatStateOf(0f)
     private var deltaY: Float by mutableFloatStateOf(deltaY)
 
-    private lateinit var animatedApproachMeasurement: MotionDriver.AnimatedApproachMeasurement
     private lateinit var motionDriver: MotionDriver
+    // Created after the first lookahead measure, guaranteed to be created before first measure
+    private var revealAlpha: ManagedMotionValue? = null
 
     fun update(motionBuilderContext: MotionBuilderContext, deltaY: Float) {
         this.motionBuilderContext = motionBuilderContext
@@ -107,25 +104,13 @@ private class FadeContentRevealNode(
 
     override fun onAttach() {
         motionDriver = findMotionDriver()
-        animatedApproachMeasurement =
-            motionDriver.animatedApproachMeasurement(
-                request = MotionDriver.RequestConstraints.MaxHeight,
-                spec = derivedStateOf(::spec)::value,
-                label = "FadeContentReveal(${label.orEmpty()})",
-                debug = debug,
-            )
     }
 
     override fun onDetach() {
-        animatedApproachMeasurement.dispose()
+        revealAlpha?.dispose()
     }
 
     private fun spec(): MotionSpec {
-        if (lookAheadHeight == 0f) {
-            // We cannot compute specs for height 0.
-            return motionBuilderContext.fixedEffectsValueSpec(0f)
-        }
-
         return when (motionDriver.verticalState) {
             MotionDriver.State.MinValue -> {
                 motionBuilderContext.fixedEffectsValueSpec(0f)
@@ -145,20 +130,39 @@ private class FadeContentRevealNode(
         measurable: Measurable,
         constraints: Constraints,
     ): MeasureResult {
+        return if (isLookingAhead) {
+            lookAheadMeasure(measurable, constraints)
+        } else {
+            measurable.measure(constraints).run { layout(width, height) { place(IntOffset.Zero) } }
+        }
+    }
+
+    private fun MeasureScope.lookAheadMeasure(
+        measurable: Measurable,
+        constraints: Constraints,
+    ): MeasureResult {
         val placeable = measurable.measure(constraints)
-        if (isLookingAhead) {
-            lookAheadHeight = placeable.height.toFloat()
+        val targetHeight = placeable.height.toFloat()
+        lookAheadHeight = targetHeight
+        if (revealAlpha == null) {
+            val maxHeightDriven =
+                motionDriver.maxHeightDriven(
+                    spec = derivedStateOf(::spec)::value,
+                    label = "FadeContentReveal(${label.orEmpty()})",
+                )
+            revealAlpha = maxHeightDriven
+            delegate(DebugMotionValueNode(maxHeightDriven))
         }
         return layout(placeable.width, placeable.height) {
-            if (isLookingAhead) {
-                layoutOffsetY = with(motionDriver) { driverOffset() }.y
-            }
+            layoutOffsetY = with(motionDriver) { driverOffset() }.y
             placeable.place(IntOffset.Zero)
         }
     }
 
     override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean {
-        return animatedApproachMeasurement.inProgress
+        val revealAlpha = revealAlpha
+        return revealAlpha != null &&
+            (motionDriver.verticalState == MotionDriver.State.Transition || !revealAlpha.isStable)
     }
 
     override fun ApproachMeasureScope.approachMeasure(
@@ -167,14 +171,12 @@ private class FadeContentRevealNode(
     ): MeasureResult {
         return measurable.measure(constraints).run {
             layout(width, height) {
-                val revealAlpha = animatedApproachMeasurement.value.fastCoerceAtLeast(0f)
-                if (revealAlpha < 1f) {
-                    placeWithLayer(IntOffset.Zero) {
+                placeWithLayer(IntOffset.Zero) {
+                    val revealAlpha = checkNotNull(revealAlpha).output.fastCoerceAtLeast(0f)
+                    if (revealAlpha < 1f) {
                         alpha = revealAlpha
                         compositingStrategy = CompositingStrategy.ModulateAlpha
                     }
-                } else {
-                    place(IntOffset.Zero)
                 }
             }
         }
