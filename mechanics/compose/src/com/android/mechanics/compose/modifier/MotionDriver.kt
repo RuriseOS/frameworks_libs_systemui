@@ -16,12 +16,10 @@
 
 package com.android.mechanics.compose.modifier
 
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -34,19 +32,15 @@ import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.TraversableNode
-import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.findNearestAncestor
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.util.fastForEach
 import com.android.mechanics.GestureContext
-import com.android.mechanics.MotionValue
-import com.android.mechanics.MotionValue.Companion.StableThresholdEffect
-import com.android.mechanics.compose.modifier.MotionDriver.RequestConstraints
-import com.android.mechanics.debug.LocalMotionValueDebugController
+import com.android.mechanics.ManagedMotionValue
+import com.android.mechanics.MotionValueCollection
 import com.android.mechanics.spec.MotionSpec
-import kotlinx.coroutines.DisposableHandle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private const val TRAVERSAL_NODE_KEY = "MotionDriverNode"
@@ -66,13 +60,10 @@ internal fun DelegatableNode.findMotionDriver(): MotionDriver {
 /**
  * A central interface for driving animations based on layout constraints.
  *
- * A `MotionDriver` is attached to a specific layout node using the [motionDriver] modifier.
- * Descendant nodes can find this driver to create animations whose target values are derived from
- * the driver's layout `Constraints`. It also provides access to the layout's geometry and a shared
- * [GestureContext].
- *
- * This allows for coordinated animations within a component tree that react to changes in a
- * parent's size, such as expanding or collapsing.
+ * A `MotionDriver` is attached to a layout node using the [motionDriver] modifier. Descendant nodes
+ * can then find this driver to create animations whose target values are derived from the driver's
+ * layout `Constraints`. This allows for coordinated animations within a component tree that react
+ * to a parent's size changes, such as expanding or collapsing.
  */
 internal interface MotionDriver {
     /** The [GestureContext] associated with this motion. */
@@ -103,62 +94,16 @@ internal interface MotionDriver {
     fun Placeable.PlacementScope.driverOffset(): Offset
 
     /**
-     * Creates and registers a [AnimatedApproachMeasurement] that animates based on layout
-     * constraints.
+     * Creates and registers a [ManagedMotionValue] that animates based on layout constraints.
      *
-     * The returned value will automatically update its output whenever the `MotionDriver`'s layout
-     * constraints change.
+     * The value will automatically update its output whenever the `MotionDriver`'s `maxHeight`
+     * constraint changes.
      *
-     * @param request Defines how to extract a `Float` input value from the incoming `Constraints`.
      * @param spec A factory for the [MotionSpec] that governs the animation.
      * @param label A string identifier for debugging purposes.
-     * @param stableThreshold The threshold (in pixels) at which the value is considered stable.
-     * @return An [AnimatedApproachMeasurement] that provides the animated output.
+     * @return A [ManagedMotionValue] that provides the animated output.
      */
-    fun animatedApproachMeasurement(
-        request: RequestConstraints,
-        spec: () -> MotionSpec,
-        label: String? = null,
-        stableThreshold: Float = StableThresholdEffect,
-        debug: Boolean = false,
-    ): AnimatedApproachMeasurement
-
-    /**
-     * A functional interface that defines how to convert layout [Constraints] into a single `Float`
-     * value, which serves as the input for a [AnimatedApproachMeasurement].
-     */
-    fun interface RequestConstraints {
-
-        /**
-         * Extracts a `Float` input from the given [constraints].
-         *
-         * @param constraints The layout constraints provided during the measurement pass.
-         * @return The `Float` value to be used as the animation input.
-         */
-        fun constraintsToInput(constraints: Constraints): Float
-
-        /**
-         * A predefined [RequestConstraints] implementation that uses the `maxHeight` of the
-         * constraints as the input value.
-         */
-        object MaxHeight : RequestConstraints {
-            override fun constraintsToInput(constraints: Constraints): Float {
-                return constraints.maxHeight.toFloat()
-            }
-        }
-    }
-
-    /**
-     * Represents a value that is derived from layout constraints and animated by a [MotionSpec].
-     *
-     * This value is state-backed and can be read in composition or snapshot-aware contexts to
-     * trigger recomposition or other effects when it changes.
-     */
-    interface AnimatedApproachMeasurement : DisposableHandle {
-        val inProgress: Boolean
-
-        val value: Float
-    }
+    fun maxHeightDriven(spec: () -> MotionSpec, label: String? = null): ManagedMotionValue
 }
 
 /**
@@ -176,10 +121,11 @@ fun Modifier.motionDriver(gestureContext: GestureContext, label: String? = null)
 
 private data class MotionDriverElement(val gestureContext: GestureContext, val label: String?) :
     ModifierNodeElement<MotionDriverNode>() {
-    override fun create(): MotionDriverNode = MotionDriverNode(gestureContext = gestureContext)
+    override fun create(): MotionDriverNode =
+        MotionDriverNode(gestureContext = gestureContext, label = label)
 
     override fun update(node: MotionDriverNode) {
-        node.update(gestureContext = gestureContext)
+        check(node.gestureContext == gestureContext) { "Cannot change the gestureContext" }
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -188,26 +134,31 @@ private data class MotionDriverElement(val gestureContext: GestureContext, val l
     }
 }
 
-private class MotionDriverNode(override var gestureContext: GestureContext) :
+private class MotionDriverNode(override val gestureContext: GestureContext, label: String?) :
     Modifier.Node(),
     TraversableNode,
     LayoutModifierNode,
     MotionDriver,
     CompositionLocalConsumerModifierNode {
-    private val animatedValues = mutableListOf<AnimatedApproachMeasurementImpl>()
-    private var driverCoordinates: LayoutCoordinates? = null
-    private var lookAheadHeight: Int = 0
-
     override val traverseKey: Any = TRAVERSAL_NODE_KEY
     override var verticalState: MotionDriver.State by mutableStateOf(MotionDriver.State.MinValue)
 
-    fun update(gestureContext: GestureContext) {
-        this.gestureContext = gestureContext
+    private var driverCoordinates: LayoutCoordinates? = null
+    private var lookAheadHeight: Int = 0
+    private var input by mutableFloatStateOf(0f)
+    private val motionValues = MotionValueCollection(::input, gestureContext, label = label)
+
+    override fun onAttach() {
+        coroutineScope.launch(Dispatchers.Main.immediate) { motionValues.keepRunning() }
+    }
+
+    override fun maxHeightDriven(spec: () -> MotionSpec, label: String?): ManagedMotionValue {
+        return motionValues.create(spec, label)
     }
 
     override fun Placeable.PlacementScope.driverOffset(): Offset {
-        val driverCoordinates = requireNotNull(driverCoordinates) { "" }
-        val childCoordinates = requireNotNull(coordinates) { "" }
+        val driverCoordinates = requireNotNull(driverCoordinates) { "No driver coordinates" }
+        val childCoordinates = requireNotNull(coordinates) { "No child coordinates" }
         return driverCoordinates.localPositionOf(childCoordinates)
     }
 
@@ -229,97 +180,12 @@ private class MotionDriverNode(override var gestureContext: GestureContext) :
                     else -> MotionDriver.State.Transition
                 }
 
-            animatedValues.fastForEach { it.updateInput(constraints) }
+            input = constraints.maxHeight.toFloat()
         }
 
         return layout(width = placeable.width, height = placeable.height) {
             driverCoordinates = coordinates
             placeable.place(IntOffset.Zero)
         }
-    }
-
-    override fun animatedApproachMeasurement(
-        request: RequestConstraints,
-        spec: () -> MotionSpec,
-        label: String?,
-        stableThreshold: Float,
-        debug: Boolean,
-    ): MotionDriver.AnimatedApproachMeasurement {
-        val animatedApproachMeasurement =
-            AnimatedApproachMeasurementImpl(
-                request = request,
-                gestureContext = gestureContext,
-                spec = spec,
-                label = label,
-                stableThreshold = stableThreshold,
-                onDispose = { animatedValues -= this },
-            )
-        animatedValues += animatedApproachMeasurement
-
-        val debugController = if (debug) currentValueOf(LocalMotionValueDebugController) else null
-        coroutineScope.launch {
-            val disposableHandle =
-                debugController?.register(animatedApproachMeasurement.motionValue)
-            try {
-                animatedApproachMeasurement.keepRunningWhileObserved()
-            } finally {
-                disposableHandle?.dispose()
-            }
-        }
-
-        coroutineScope.launch {
-            while (animatedApproachMeasurement.isObserved) {
-                withFrameNanos { animatedApproachMeasurement.computeOutput() }
-            }
-        }
-
-        return animatedApproachMeasurement
-    }
-
-    private class AnimatedApproachMeasurementImpl(
-        private val request: RequestConstraints,
-        gestureContext: GestureContext,
-        spec: () -> MotionSpec,
-        label: String?,
-        stableThreshold: Float,
-        private val onDispose: AnimatedApproachMeasurementImpl.() -> Unit,
-    ) : MotionDriver.AnimatedApproachMeasurement {
-        var isObserved = true
-        private var lastInput: Float? = null
-
-        val motionValue: MotionValue =
-            MotionValue(
-                input = { lastInput ?: 0f },
-                gestureContext = gestureContext,
-                spec = derivedStateOf(spec)::value,
-                label = label,
-                stableThreshold = stableThreshold,
-            )
-
-        override var inProgress: Boolean by mutableStateOf(false)
-
-        override var value: Float by mutableFloatStateOf(motionValue.output)
-
-        fun updateInput(input: Constraints): Boolean {
-            val newInput = request.constraintsToInput(input)
-            val isNew = lastInput != newInput
-            if (isNew) lastInput = newInput
-            return isNew
-        }
-
-        fun computeOutput() {
-            val currentOutput = motionValue.output
-            if (currentOutput.isFinite()) {
-                inProgress = value != currentOutput
-                value = currentOutput
-            }
-        }
-
-        override fun dispose() {
-            isObserved = false
-            onDispose()
-        }
-
-        suspend fun keepRunningWhileObserved() = motionValue.keepRunningWhile { isObserved }
     }
 }
