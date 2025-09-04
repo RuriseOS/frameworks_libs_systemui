@@ -26,13 +26,9 @@ import com.android.mechanics.spec.builder.EffectApplyScope
 import com.android.mechanics.spec.builder.EffectPlacement
 
 /** An effect that reveals a component when the available space reaches a certain threshold. */
-data class RevealOnThreshold(
-    val minSize: Dp = Defaults.MinSize,
-    val cornerMaxSize: Dp = Defaults.CornerMaxSize,
-) : Effect.PlaceableBetween {
+data class RevealOnThreshold(val minSize: Dp = Defaults.MinSize) : Effect.PlaceableBetween {
     init {
         require(minSize >= 0.dp)
-        require(cornerMaxSize >= 0.dp)
     }
 
     override fun EffectApplyScope.createSpec(
@@ -56,6 +52,5 @@ data class RevealOnThreshold(
 
     object Defaults {
         val MinSize: Dp = 8.dp
-        val CornerMaxSize: Dp = 32.dp
     }
 }
