@@ -38,7 +38,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import platform.test.motion.compose.MonotonicClockTestScope
-import platform.test.motion.compose.runMonotonicClockTest
 
 /** Benchmark, which will execute on an Android device. Previous results: go/mm-microbenchmarks */
 @RunWith(Parameterized::class)
@@ -47,7 +46,9 @@ class MotionValueCollectionBenchmark(private val instanceCount: Int) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "instanceCount={0}")
-        fun instanceCount() = listOf(100)
+        fun instanceCount() = listOf(1, 100)
+
+        val DefaultSpring = SpringParameters(stiffness = 300f, dampingRatio = .9f)
     }
 
     @get:Rule val benchmarkRule = BenchmarkRule()
@@ -117,69 +118,77 @@ class MotionValueCollectionBenchmark(private val instanceCount: Int) {
         testScheduler.advanceTimeBy(16)
     }
 
+    private fun MonotonicClockTestScope.measureOscillatingInput(
+        fixture: TestFixture,
+        stepSize: Float = 1f,
+    ) {
+        var step = stepSize
+        benchmarkRule.measureRepeated {
+            val lastInput = fixture.gestureContext.dragOffset
+            if (lastInput <= .5f) step = stepSize else if (lastInput >= 9.5f) step = -stepSize
+            fixture.gestureContext.dragOffset = lastInput + step
+            nextFrame()
+        }
+    }
+
     @Test
     fun noChange() = runMonotonicClockTest {
         val fixture = testFixture()
 
-        benchmarkRule.measureRepeated {
-            fixture.gestureContext.dragOffset += 0f
-            nextFrame()
-        }
+        measureOscillatingInput(fixture, stepSize = 0f)
     }
 
     @Test
     fun changeInput() = runMonotonicClockTest {
         val fixture = testFixture()
 
-        benchmarkRule.measureRepeated {
-            fixture.gestureContext.dragOffset += 1f
-            nextFrame()
-        }
+        measureOscillatingInput(fixture)
+    }
+
+    @Test
+    fun changeInput_sameOutput() = runMonotonicClockTest {
+        val spec = MotionSpec(directionalMotionSpec(Mapping.Zero))
+
+        val fixture = testFixture(initialInput = 4f) { spec }
+        measureOscillatingInput(fixture)
+    }
+
+    @Test
+    fun changeSegment_noDiscontinuity() = runMonotonicClockTest {
+        val spec =
+            MotionSpec(
+                directionalMotionSpec(DefaultSpring, Mapping.Zero) {
+                    mapping(breakpoint = 5f, mapping = Mapping.Zero)
+                }
+            )
+
+        val fixture = testFixture(initialInput = 4f) { spec }
+        measureOscillatingInput(fixture)
     }
 
     @Test
     fun animateOutput() = runMonotonicClockTest {
         val spec =
             MotionSpec(
-                directionalMotionSpec(
-                    defaultSpring = SpringParameters(stiffness = 300f, dampingRatio = .9f),
-                    initialMapping = Mapping.Zero,
-                ) {
+                directionalMotionSpec(DefaultSpring, Mapping.Zero) {
                     fixedValue(breakpoint = 5f, value = 1f)
                 }
             )
 
         val fixture = testFixture(initialInput = 4f) { spec }
-        var stepSize = 1f
-
-        benchmarkRule.measureRepeated {
-            val lastInput = fixture.gestureContext.dragOffset
-            if (lastInput <= .5f) stepSize = 1f else if (lastInput >= 9.5f) stepSize = -1f
-            fixture.gestureContext.dragOffset = lastInput + stepSize
-            nextFrame()
-        }
+        measureOscillatingInput(fixture)
     }
 
     @Test
     fun animateWithGuarantee() = runMonotonicClockTest {
         val spec =
             MotionSpec(
-                directionalMotionSpec(
-                    defaultSpring = SpringParameters(stiffness = 300f, dampingRatio = .9f),
-                    initialMapping = Mapping.Zero,
-                ) {
+                directionalMotionSpec(DefaultSpring, Mapping.Zero) {
                     fixedValue(breakpoint = 5f, value = 1f, guarantee = Guarantee.InputDelta(4f))
                 }
             )
 
         val fixture = testFixture { spec }
-        var stepSize = 1f
-
-        benchmarkRule.measureRepeated {
-            val lastInput = fixture.gestureContext.dragOffset
-            if (lastInput <= .5f) stepSize = 1f else if (lastInput >= 9.5f) stepSize = -1f
-            fixture.gestureContext.dragOffset = lastInput + stepSize
-            nextFrame()
-        }
+        measureOscillatingInput(fixture)
     }
 }
