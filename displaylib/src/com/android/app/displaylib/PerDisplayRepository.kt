@@ -180,6 +180,7 @@ constructor(
     @DisplayLibBackground bgApplicationScope: CoroutineScope,
     private val displayRepository: DisplayRepository,
     private val initCallback: PerDisplayRepository.InitCallback,
+    @Assisted private val createInstanceEagerly: Boolean = false,
 ) : PerDisplayRepository<T> {
 
     private val perDisplayInstances = ConcurrentHashMap<Int, T?>()
@@ -212,6 +213,13 @@ constructor(
     private suspend fun start() {
         initCallback.onInit(debugName, this)
         allowedDisplays.collectLatest { displayIds ->
+            if (createInstanceEagerly) {
+                val toAdd = displayIds - perDisplayInstances.keys
+                toAdd.forEach { displayId ->
+                    Log.d(TAG, "<$debugName> eagerly creating instance for displayId=$displayId.")
+                    get(displayId)
+                }
+            }
             val toRemove = perDisplayInstances.keys - displayIds
             toRemove.forEach { displayId ->
                 Log.d(TAG, "<$debugName> destroying instance for displayId=$displayId.")
@@ -225,7 +233,10 @@ constructor(
     }
 
     override fun get(displayId: Int): T? {
-        if (!displayRepository.containsDisplay(displayId)) {
+        if (
+            !displayRepository.containsDisplay(displayId) ||
+                displayRepository.getDisplay(displayId) == null
+        ) {
             Log.e(TAG, "<$debugName: Display with id $displayId doesn't exist.")
             return null
         }
@@ -285,6 +296,7 @@ constructor(
             debugName: String,
             instanceProvider: PerDisplayInstanceProvider<T>,
             overrideLifecycleManager: DisplayInstanceLifecycleManager? = null,
+            createInstanceEagerly: Boolean = false,
         ): PerDisplayInstanceRepositoryImpl<T>
     }
 
