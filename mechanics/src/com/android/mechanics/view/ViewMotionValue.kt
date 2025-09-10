@@ -205,6 +205,7 @@ private class ImperativeComputations(
     override var lastInput: Float = currentInput
     override var lastGestureDragOffset: Float = currentGestureDragOffset
     override var directMappedVelocity: Float = 0f
+    override var lastHapticsTimeNanos: Long = -1L
     var lastDirection: InputDirection = currentDirection
 
     // ---- Lifecycle ------------------------------------------------------------------------------

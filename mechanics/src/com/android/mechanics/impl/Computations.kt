@@ -22,6 +22,7 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastIsFinite
 import androidx.compose.ui.util.lerp
 import com.android.mechanics.MotionValue.Companion.TAG
+import com.android.mechanics.haptics.BreakpointHaptics
 import com.android.mechanics.spec.Guarantee
 import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.Mapping
@@ -36,6 +37,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
         val segment: SegmentData,
         val guarantee: GuaranteeState,
         val animation: DiscontinuityAnimation,
+        val breakpointHaptics: BreakpointHaptics?,
     )
 
     // currentComputedValues input
@@ -50,6 +52,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
             MotionSpec.InitiallyUndefined.segmentAtInput(memoizedInput, memoizedDirection),
             GuaranteeState.Inactive,
             DiscontinuityAnimation.None,
+            BreakpointHaptics.None,
         )
 
     internal val currentComputedValues: ComputedValues
@@ -86,6 +89,7 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                         currentSpec.segmentAtInput(currentInput, currentDirection),
                         GuaranteeState.Inactive,
                         DiscontinuityAnimation.None,
+                        BreakpointHaptics.None,
                     )
                 } else {
                     val segment: SegmentData =
@@ -119,7 +123,9 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
                             animationTimeNanos = currentAnimationTimeNanos,
                         )
 
-                    ComputedValues(segment, guarantee, animation)
+                    val breakpointHaptics = computeBreakpointHaptics(segment, segmentChange)
+
+                    ComputedValues(segment, guarantee, animation, breakpointHaptics)
                 }
             return memoizedComputedValues
         }
@@ -633,6 +639,15 @@ internal abstract class Computations : CurrentFrameInput, LastFrameState, Static
             }
         }
     }
+
+    private fun computeBreakpointHaptics(
+        segment: SegmentData,
+        segmentChange: SegmentChangeType,
+    ): BreakpointHaptics? =
+        when (segmentChange) {
+            SegmentChangeType.Traverse -> segment.entryBreakpoint.breakpointHaptics
+            else -> null
+        }
 
     /**
      * Precondition to ensure that this [Computations] has not yet been initialized with a

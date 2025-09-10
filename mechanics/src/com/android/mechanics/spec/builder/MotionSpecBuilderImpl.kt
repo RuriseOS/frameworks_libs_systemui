@@ -23,6 +23,8 @@ import androidx.collection.MutableIntObjectMap
 import androidx.collection.MutableLongList
 import androidx.collection.ObjectList
 import androidx.collection.mutableObjectListOf
+import com.android.mechanics.haptics.BreakpointHaptics
+import com.android.mechanics.haptics.SegmentHaptics
 import com.android.mechanics.spec.Breakpoint
 import com.android.mechanics.spec.BreakpointKey
 import com.android.mechanics.spec.Guarantee
@@ -328,7 +330,7 @@ internal class MotionSpecBuilderImpl(
         semantics: List<SemanticValue<*>>,
         init: DirectionalEffectBuilderScope.() -> Unit,
     ) {
-        forward(initialMapping, semantics, init)
+        forward(initialMapping, SegmentHaptics.None, semantics, init)
         backward(initialMapping, semantics, init)
     }
 
@@ -339,13 +341,14 @@ internal class MotionSpecBuilderImpl(
 
     override fun forward(
         initialMapping: Mapping,
+        initialSegmentHaptics: SegmentHaptics,
         semantics: List<SemanticValue<*>>,
         init: DirectionalEffectBuilderScope.() -> Unit,
     ) {
         check(!forwardInvoked) { "Cannot define forward spec more than once" }
         forwardInvoked = true
 
-        forwardBuilder.prepareBuilderFn(initialMapping, semantics)
+        forwardBuilder.prepareBuilderFn(initialMapping, initialSegmentHaptics, semantics)
         forwardBuilder.init()
     }
 
@@ -353,7 +356,7 @@ internal class MotionSpecBuilderImpl(
         check(!forwardInvoked) { "Cannot define forward spec more than once" }
         forwardInvoked = true
 
-        forwardBuilder.prepareBuilderFn(mapping, semantics)
+        forwardBuilder.prepareBuilderFn(mapping, SegmentHaptics.None, semantics)
     }
 
     override fun backward(
@@ -364,7 +367,7 @@ internal class MotionSpecBuilderImpl(
         check(!backwardInvoked) { "Cannot define backward spec more than once" }
         backwardInvoked = true
 
-        reverseBuilder.prepareBuilderFn(initialMapping, semantics)
+        reverseBuilder.prepareBuilderFn(initialMapping, SegmentHaptics.None, semantics)
         reverseBuilder.init()
     }
 
@@ -372,7 +375,7 @@ internal class MotionSpecBuilderImpl(
         check(!backwardInvoked) { "Cannot define backward spec more than once" }
         backwardInvoked = true
 
-        reverseBuilder.prepareBuilderFn(mapping, semantics)
+        reverseBuilder.prepareBuilderFn(mapping, SegmentHaptics.None, semantics)
     }
 
     private var forwardInvoked = false
@@ -389,9 +392,16 @@ internal class MotionSpecBuilderImpl(
 
         if (effectId == NoEffectPlaceholderId) {
             val maxBreakpoint =
-                Breakpoint.create(maxLimitKey, actualPlacement.max, defaultSpring, Guarantee.None)
+                Breakpoint.create(
+                    maxLimitKey,
+                    actualPlacement.max,
+                    defaultSpring,
+                    Guarantee.None,
+                    BreakpointHaptics.None,
+                )
             builders.forEach { builder ->
                 builder.mappings += builder.afterMapping ?: baseMapping
+                builder.segmentHaptics += SegmentHaptics.None
                 builder.breakpoints += maxBreakpoint
             }
             return
@@ -427,6 +437,7 @@ internal class MotionSpecBuilderImpl(
             builder.finalizeBuilderFn(
                 actualPlacement.max,
                 maxLimitKey,
+                builder.afterBreakpointHaptics ?: BreakpointHaptics.None,
                 builder.afterSpring ?: defaultSpring,
                 builder.afterGuarantee ?: Guarantee.None,
                 builder.afterSemantics ?: emptyList(),
@@ -465,34 +476,40 @@ private class DirectionalEffectBuilderScopeImpl(defaultSpring: SpringParameters)
     var beforeSpring: SpringParameters? = null
     var beforeSemantics: List<SemanticValue<*>>? = null
     var beforeMapping: Mapping? = null
+    var beforeBreakpointHaptics: BreakpointHaptics? = null
 
     override fun before(
         spring: SpringParameters?,
         guarantee: Guarantee?,
         semantics: List<SemanticValue<*>>?,
         mapping: Mapping?,
+        breakpointHaptics: BreakpointHaptics?,
     ) {
         beforeGuarantee = guarantee
         beforeSpring = spring
         beforeSemantics = semantics
         beforeMapping = mapping
+        beforeBreakpointHaptics = breakpointHaptics
     }
 
     var afterGuarantee: Guarantee? = null
     var afterSpring: SpringParameters? = null
     var afterSemantics: List<SemanticValue<*>>? = null
     var afterMapping: Mapping? = null
+    var afterBreakpointHaptics: BreakpointHaptics? = null
 
     override fun after(
         spring: SpringParameters?,
         guarantee: Guarantee?,
         semantics: List<SemanticValue<*>>?,
         mapping: Mapping?,
+        breakpointHaptics: BreakpointHaptics?,
     ) {
         afterGuarantee = guarantee
         afterSpring = spring
         afterSemantics = semantics
         afterMapping = mapping
+        afterBreakpointHaptics = breakpointHaptics
     }
 
     fun resetBeforeAfter() {
@@ -504,6 +521,8 @@ private class DirectionalEffectBuilderScopeImpl(defaultSpring: SpringParameters)
         afterSpring = null
         afterSemantics = null
         afterMapping = null
+        afterBreakpointHaptics = null
+        beforeBreakpointHaptics = null
     }
 }
 
