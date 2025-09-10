@@ -29,6 +29,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import com.android.mechanics.debug.DebugInspector
 import com.android.mechanics.debug.FrameData
+import com.android.mechanics.haptics.BreakpointHaptics
+import com.android.mechanics.haptics.HapticPlayer
+import com.android.mechanics.haptics.SegmentHaptics
 import com.android.mechanics.impl.Computations
 import com.android.mechanics.impl.DiscontinuityAnimation
 import com.android.mechanics.impl.GuaranteeState
@@ -122,6 +125,8 @@ import kotlinx.coroutines.withContext
  * @param label An optional label to aid in debugging.
  * @param stableThreshold A threshold value (in output units) that determines when the
  *   [MotionValue]'s internal spring animation is considered stable.
+ * @param hapticPlayer When specifying segment and breakpoint haptics, this player will be used to
+ *   deliver haptic feedback.
  */
 class MotionValue(
     input: () -> Float,
@@ -129,6 +134,7 @@ class MotionValue(
     spec: () -> MotionSpec,
     label: String? = null,
     stableThreshold: Float = StableThresholdEffect,
+    hapticPlayer: HapticPlayer = HapticPlayer.NoPlayer,
 ) : MotionValueState {
     private val impl =
         ObservableComputations(
@@ -137,6 +143,7 @@ class MotionValue(
             specProvider = spec,
             stableThreshold = stableThreshold,
             label = label,
+            hapticPlayer = hapticPlayer,
         )
 
     /** The [MotionSpec] describing the mapping of this [MotionValue]'s input to the output. */
@@ -291,6 +298,7 @@ private class ObservableComputations(
     private val specProvider: () -> MotionSpec,
     override val stableThreshold: Float,
     override val label: String?,
+    private val hapticPlayer: HapticPlayer,
 ) : Computations() {
 
     // ----  CurrentFrameInput ---------------------------------------------------------------------
@@ -308,6 +316,8 @@ private class ObservableComputations(
         get() = gestureContext.dragOffset
 
     override var currentAnimationTimeNanos by mutableLongStateOf(-1L)
+
+    override var lastHapticsTimeNanos by mutableLongStateOf(-1L)
 
     // ----  LastFrameState ---------------------------------------------------------------------
 
@@ -406,12 +416,14 @@ private class ObservableComputations(
                 }
 
                 var scheduleNextFrame = false
+                var breakpointHaptics: BreakpointHaptics? = null
                 if (!isSameSegmentAndAtRest) {
                     // Read currentComputedValues only once and update it, if necessary
                     val currentValues = currentComputedValues
 
                     if (capturedSegment != currentValues.segment) {
                         capturedSegment = currentValues.segment
+                        breakpointHaptics = currentValues.breakpointHaptics
                         scheduleNextFrame = true
                     }
 
@@ -444,6 +456,13 @@ private class ObservableComputations(
                 if (capturedDirection != currentDirection) {
                     capturedDirection = currentDirection
                     scheduleNextFrame = true
+                }
+
+                // Perform haptics
+                if (breakpointHaptics != null) {
+                    performBreakpointHapticFeedback(breakpointHaptics)
+                } else {
+                    performSegmentHapticFeedback(capturedSegment.haptics)
                 }
 
                 capturedFrameTimeNanos = currentAnimationTimeNanos
@@ -504,4 +523,24 @@ private class ObservableComputations(
         }
 
     var debugInspector: DebugInspector? = null
+
+    private fun performSegmentHapticFeedback(segmentHaptics: SegmentHaptics) {
+        val timeDelta = currentAnimationTimeNanos - lastHapticsTimeNanos
+        if (timeDelta < hapticPlayer.getPlaybackIntervalNanos()) return
+
+        val spatialInputPx = computedOutput
+        val velocityPxPerSec = directMappedVelocity // we assume this is always in px/sec.
+        lastHapticsTimeNanos = currentAnimationTimeNanos
+        hapticPlayer.playSegmentHaptics(segmentHaptics, spatialInputPx, velocityPxPerSec)
+    }
+
+    private fun performBreakpointHapticFeedback(breakpointHaptics: BreakpointHaptics) {
+        val timeDelta = currentAnimationTimeNanos - lastHapticsTimeNanos
+        if (timeDelta < hapticPlayer.getPlaybackIntervalNanos()) return
+
+        val spatialInputPx = computedOutput
+        val velocityPxPerSec = directMappedVelocity // we assume this is always in px/sec.
+        lastHapticsTimeNanos = currentAnimationTimeNanos
+        hapticPlayer.playBreakpointHaptics(breakpointHaptics, spatialInputPx, velocityPxPerSec)
+    }
 }
