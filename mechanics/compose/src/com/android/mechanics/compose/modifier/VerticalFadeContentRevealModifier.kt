@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.ApproachMeasureScope
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
@@ -39,43 +40,22 @@ import com.android.mechanics.debug.DebugMotionValueNode
 import com.android.mechanics.effects.FixedValue
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
-import com.android.mechanics.spec.builder.MotionBuilderContext
+import com.android.mechanics.spec.builder.ComposeMotionBuilderContext
 import com.android.mechanics.spec.builder.effectsMotionSpec
 import com.android.mechanics.spec.builder.fixedEffectsValueSpec
+import com.android.mechanics.spec.builder.motionBuilderContext
 
-/**
- * This component remains hidden until it reach its target height.
- *
- * TODO: Once b/413283893 is done, [motionBuilderContext] can be read internally via
- *   CompositionLocalConsumerModifierNode, instead of passing it.
- */
-fun Modifier.verticalFadeContentReveal(
-    motionBuilderContext: MotionBuilderContext,
-    deltaY: Float = 0f,
-    label: String? = null,
-): Modifier =
-    this then
-        FadeContentRevealElement(
-            motionBuilderContext = motionBuilderContext,
-            deltaY = deltaY,
-            label = label,
-        )
+/** This component remains hidden until it reach its target height. */
+fun Modifier.verticalFadeContentReveal(deltaY: Float = 0f, label: String? = null): Modifier =
+    this then FadeContentRevealElement(deltaY = deltaY, label = label)
 
-private data class FadeContentRevealElement(
-    val motionBuilderContext: MotionBuilderContext,
-    val deltaY: Float,
-    val label: String?,
-) : ModifierNodeElement<FadeContentRevealNode>() {
+private data class FadeContentRevealElement(val deltaY: Float, val label: String?) :
+    ModifierNodeElement<FadeContentRevealNode>() {
     override fun create(): FadeContentRevealNode =
-        FadeContentRevealNode(
-            motionBuilderContext = motionBuilderContext,
-            deltaY = deltaY,
-            label = label,
-        )
+        FadeContentRevealNode(deltaY = deltaY, label = label)
 
     override fun update(node: FadeContentRevealNode) {
         check(node.deltaY == deltaY) { "Cannot update deltaY from ${node.deltaY} to $deltaY" }
-        node.update(motionBuilderContext = motionBuilderContext)
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -85,11 +65,8 @@ private data class FadeContentRevealElement(
     }
 }
 
-private class FadeContentRevealNode(
-    private var motionBuilderContext: MotionBuilderContext,
-    val deltaY: Float,
-    private val label: String?,
-) : DelegatingNode(), ApproachLayoutModifierNode {
+private class FadeContentRevealNode(val deltaY: Float, private val label: String?) :
+    DelegatingNode(), ApproachLayoutModifierNode, CompositionLocalConsumerModifierNode {
     // These properties are calculated during the lookahead pass (`lookAheadMeasure`) to
     // orchestrate the reveal animation. They are guaranteed to be updated before `approachMeasure`
     // is called.
@@ -106,12 +83,11 @@ private class FadeContentRevealNode(
      */
     private lateinit var motionDriver: MotionDriver
 
+    private lateinit var motionBuilderContext: ComposeMotionBuilderContext
+
     override fun onAttach() {
         motionDriver = findMotionDriver()
-    }
-
-    fun update(motionBuilderContext: MotionBuilderContext) {
-        this.motionBuilderContext = motionBuilderContext
+        motionBuilderContext = motionBuilderContext()
     }
 
     override fun onDetach() {

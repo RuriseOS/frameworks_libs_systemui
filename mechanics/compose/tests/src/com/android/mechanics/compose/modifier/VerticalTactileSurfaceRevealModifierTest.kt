@@ -56,7 +56,6 @@ import com.android.compose.animation.scene.transitions
 import com.android.mechanics.debug.LocalMotionValueDebugController
 import com.android.mechanics.debug.MotionValueDebugController
 import com.android.mechanics.spec.builder.MotionBuilderContext
-import com.android.mechanics.spec.builder.rememberMotionBuilderContext
 import com.android.mechanics.testing.FakeMotionSpecBuilderContext
 import org.junit.Rule
 import org.junit.Test
@@ -122,10 +121,7 @@ class VerticalTactileSurfaceRevealModifierTest(val useOverlays: Boolean) :
                                             else -> Color.Blue
                                         },
                                     )
-                                    .verticalTactileSurfaceReveal(
-                                        motionBuilderContext = rememberMotionBuilderContext(),
-                                        label = "box$it",
-                                    )
+                                    .verticalTactileSurfaceReveal(label = "box$it")
                                     .size(50.dp)
                             )
                         }
