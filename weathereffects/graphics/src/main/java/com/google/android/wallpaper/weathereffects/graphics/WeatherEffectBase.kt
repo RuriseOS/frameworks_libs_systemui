@@ -26,7 +26,7 @@ import android.util.SizeF
 import com.google.android.wallpaper.weathereffects.graphics.utils.GraphicsUtils
 import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.calculateTransformDifference
 import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.centerCropMatrix
-import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.getScale
+import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.getScaleFromMatrixValues
 import com.google.android.wallpaper.weathereffects.graphics.utils.MatrixUtils.invertAndTransposeMatrix
 import kotlin.random.Random
 
@@ -37,18 +37,28 @@ abstract class WeatherEffectBase(
     /** The initial size of the surface where the effect will be shown. */
     private var surfaceSize: SizeF,
 ) : WeatherEffect {
-    private var centerCropMatrix: Matrix =
+    protected var centerCropMatrix: Matrix =
         centerCropMatrix(
             surfaceSize,
             SizeF(background.width.toFloat(), background.height.toFloat()),
         )
+        set(value) {
+            field = value
+            value.getValues(centerCropMatrixValues)
+        }
+
     protected var parallaxMatrix = Matrix(centerCropMatrix)
+    private val centerCropMatrixValues: FloatArray =
+        FloatArray(9).apply { centerCropMatrix.getValues(this) }
+    private val parallaxMatrixValues: FloatArray =
+        FloatArray(9).apply { parallaxMatrix.getValues(this) }
     // Currently, we use same transform for both foreground and background
     protected open val transformMatrixBitmap: FloatArray = FloatArray(9)
+    protected open val transformMatrixCenterCrop: FloatArray = FloatArray(9)
     // Apply to weather components not rely on image textures
     // Should be identity matrix in editor, and only change when parallax applied in homescreen
     private val transformMatrixWeather: FloatArray = FloatArray(9)
-    protected var bitmapScale = getScale(centerCropMatrix)
+    protected var bitmapScale = getScaleFromMatrixValues(centerCropMatrixValues)
     protected var elapsedTime: Float = 0f
 
     abstract val shader: RuntimeShader
@@ -57,24 +67,35 @@ abstract class WeatherEffectBase(
     abstract val colorGradingIntensity: Float
 
     override fun setMatrix(matrix: Matrix) {
-        this.parallaxMatrix.set(matrix)
-        bitmapScale = getScale(parallaxMatrix)
+        if (matrix == this.parallaxMatrix) {
+            return
+        }
+
+        this.parallaxMatrix.setAndUpdateFloatArray(matrix, parallaxMatrixValues)
+        bitmapScale = getScaleFromMatrixValues(parallaxMatrixValues)
         adjustCropping(surfaceSize)
     }
 
+    /** This function will be called every time parallax changes, don't do heavy things here */
     open fun adjustCropping(newSurfaceSize: SizeF) {
         invertAndTransposeMatrix(parallaxMatrix, transformMatrixBitmap)
+        invertAndTransposeMatrix(centerCropMatrix, transformMatrixCenterCrop)
         calculateTransformDifference(centerCropMatrix, parallaxMatrix, transformMatrixWeather)
         shader.setFloatUniform("transformMatrixBitmap", transformMatrixBitmap)
         shader.setFloatUniform("transformMatrixWeather", transformMatrixWeather)
-        shader.setFloatUniform("screenSize", newSurfaceSize.width, newSurfaceSize.height)
-        shader.setFloatUniform("screenAspectRatio", GraphicsUtils.getAspectRatio(newSurfaceSize))
     }
 
     open fun updateGridSize(newSurfaceSize: SizeF) {}
 
     override fun resize(newSurfaceSize: SizeF) {
         surfaceSize = newSurfaceSize
+        centerCropMatrix =
+            centerCropMatrix(
+                surfaceSize,
+                SizeF(background.width.toFloat(), background.height.toFloat()),
+            )
+        shader.setFloatUniform("screenSize", newSurfaceSize.width, newSurfaceSize.height)
+        shader.setFloatUniform("screenAspectRatio", GraphicsUtils.getAspectRatio(newSurfaceSize))
         adjustCropping(newSurfaceSize)
         updateGridSize(newSurfaceSize)
     }
@@ -113,8 +134,8 @@ abstract class WeatherEffectBase(
                 surfaceSize,
                 SizeF(background.width.toFloat(), background.height.toFloat()),
             )
-        parallaxMatrix.set(centerCropMatrix)
-        bitmapScale = getScale(centerCropMatrix)
+        parallaxMatrix.setAndUpdateFloatArray(centerCropMatrix, parallaxMatrixValues)
+        bitmapScale = getScaleFromMatrixValues(centerCropMatrixValues)
         shader.setInputBuffer(
             "background",
             BitmapShader(this.background, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
@@ -137,6 +158,14 @@ abstract class WeatherEffectBase(
             "background",
             BitmapShader(background, Shader.TileMode.MIRROR, Shader.TileMode.MIRROR),
         )
+
+        shader.setFloatUniform("screenSize", surfaceSize.width, surfaceSize.height)
+        shader.setFloatUniform("screenAspectRatio", GraphicsUtils.getAspectRatio(surfaceSize))
+    }
+
+    private fun Matrix.setAndUpdateFloatArray(src: Matrix, targetFloatArray: FloatArray) {
+        set(src)
+        src.getValues(targetFloatArray)
     }
 
     companion object {

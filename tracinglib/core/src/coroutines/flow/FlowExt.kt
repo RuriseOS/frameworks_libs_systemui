@@ -17,9 +17,11 @@
 package com.android.app.tracing.coroutines.flow
 
 import com.android.app.tracing.coroutines.CoroutineTraceName
+import com.android.app.tracing.coroutines.DebugSysProps.coroutineTracingEnabled
 import com.android.app.tracing.coroutines.traceCoroutine
 import com.android.app.tracing.coroutines.traceName
 import com.android.app.tracing.traceBlocking
+import com.android.systemui.util.Compile
 import kotlin.experimental.ExperimentalTypeInference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -152,7 +154,9 @@ private class TracedMutableStateFlow<T>(
 public fun <T> Flow<T>.flowName(name: String): Flow<T> = traceAs(name)
 
 public fun <T> Flow<T>.traceAs(name: String): Flow<T> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         return when (this) {
             is SharedFlow -> traceAs(name)
             else ->
@@ -168,7 +172,9 @@ public fun <T> Flow<T>.traceAs(name: String): Flow<T> {
 }
 
 public fun <T> SharedFlow<T>.traceAs(name: String): SharedFlow<T> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         when (this) {
             is MutableSharedFlow -> traceAs(name)
             is StateFlow -> traceAs(name)
@@ -180,7 +186,9 @@ public fun <T> SharedFlow<T>.traceAs(name: String): SharedFlow<T> {
 }
 
 public fun <T> StateFlow<T>.traceAs(name: String): StateFlow<T> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         when (this) {
             is MutableStateFlow -> traceAs(name)
             else -> TracedStateFlow(name, this)
@@ -191,7 +199,9 @@ public fun <T> StateFlow<T>.traceAs(name: String): StateFlow<T> {
 }
 
 public fun <T> MutableSharedFlow<T>.traceAs(name: String): MutableSharedFlow<T> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         when (this) {
             is MutableStateFlow -> traceAs(name)
             else -> TracedMutableSharedFlow(name, this)
@@ -202,7 +212,9 @@ public fun <T> MutableSharedFlow<T>.traceAs(name: String): MutableSharedFlow<T> 
 }
 
 public fun <T> MutableStateFlow<T>.traceAs(name: String): MutableStateFlow<T> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         TracedMutableStateFlow(name, this)
     } else {
         this
@@ -230,7 +242,9 @@ public fun <T> Flow<T>.onEachTraced(name: String, action: suspend (T) -> Unit): 
  * @see kotlinx.coroutines.flow.collect
  */
 public suspend fun <T> Flow<T>.collectTraced(name: String, collector: FlowCollector<T>) {
-    if (com.android.systemui.Flags.coroutineTracing()) {
+    if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         traceAs(name).collect(collector)
     } else {
         collect(collector)
@@ -239,7 +253,9 @@ public suspend fun <T> Flow<T>.collectTraced(name: String, collector: FlowCollec
 
 /** @see kotlinx.coroutines.flow.collect */
 public suspend fun <T> Flow<T>.collectTraced(name: String) {
-    if (com.android.systemui.Flags.coroutineTracing()) {
+    if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         traceAs(name).collect()
     } else {
         collect()
@@ -248,7 +264,9 @@ public suspend fun <T> Flow<T>.collectTraced(name: String) {
 
 /** @see kotlinx.coroutines.flow.collect */
 public suspend fun <T> Flow<T>.collectTraced(collector: FlowCollector<T>) {
-    if (com.android.systemui.Flags.coroutineTracing()) {
+    if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         collectTraced(name = collector.traceName, collector = collector)
     } else {
         collect(collector)
@@ -261,7 +279,9 @@ public fun <T, R> Flow<T>.mapLatestTraced(
     name: String,
     @BuilderInference transform: suspend (value: T) -> R,
 ): Flow<R> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         traceAs("mapLatest:$name").mapLatest { traceCoroutine(name) { transform(it) } }
     } else {
         mapLatest(transform)
@@ -273,7 +293,9 @@ public fun <T, R> Flow<T>.mapLatestTraced(
 public fun <T, R> Flow<T>.mapLatestTraced(
     @BuilderInference transform: suspend (value: T) -> R
 ): Flow<R> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         mapLatestTraced(transform.traceName, transform)
     } else {
         mapLatestTraced(transform)
@@ -285,7 +307,9 @@ internal suspend fun <T> Flow<T>.collectLatestTraced(
     name: String,
     action: suspend (value: T) -> Unit,
 ) {
-    if (com.android.systemui.Flags.coroutineTracing()) {
+    if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         return traceAs("collectLatest:$name").collectLatest { traceCoroutine(name) { action(it) } }
     } else {
         collectLatest(action)
@@ -294,7 +318,9 @@ internal suspend fun <T> Flow<T>.collectLatestTraced(
 
 /** @see kotlinx.coroutines.flow.collectLatest */
 public suspend fun <T> Flow<T>.collectLatestTraced(action: suspend (value: T) -> Unit) {
-    if (com.android.systemui.Flags.coroutineTracing()) {
+    if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         collectLatestTraced(action.traceName, action)
     } else {
         collectLatest(action)
@@ -307,7 +333,9 @@ public inline fun <T, R> Flow<T>.transformTraced(
     name: String,
     @BuilderInference crossinline transform: suspend FlowCollector<R>.(value: T) -> Unit,
 ): Flow<R> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         // Safe flow must be used because collector is exposed to the caller
         safeFlow {
             collect { value ->
@@ -326,7 +354,9 @@ public inline fun <T> Flow<T>.filterTraced(
     name: String,
     crossinline predicate: suspend (T) -> Boolean,
 ): Flow<T> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         unsafeTransform { value ->
             if (traceCoroutine(name) { predicate(value) }) {
                 emit(value)
@@ -342,7 +372,9 @@ public inline fun <T, R> Flow<T>.mapTraced(
     name: String,
     crossinline transform: suspend (value: T) -> R,
 ): Flow<R> {
-    return if (com.android.systemui.Flags.coroutineTracing()) {
+    return if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    ) {
         unsafeTransform { value ->
             val transformedValue = traceCoroutine(name) { transform(value) }
             emit(transformedValue)
@@ -394,4 +426,8 @@ public fun <T> MutableStateFlow<T>.asStateFlowTraced(name: String): StateFlow<T>
 }
 
 private fun <T> Flow<T>.maybeFuseTraceName(name: String): Flow<T> =
-    if (com.android.systemui.Flags.coroutineTracing()) flowOn(CoroutineTraceName(name)) else this
+    if (
+        Compile.IS_DEBUG && com.android.systemui.Flags.coroutineTracing() && coroutineTracingEnabled
+    )
+        flowOn(CoroutineTraceName(name))
+    else this

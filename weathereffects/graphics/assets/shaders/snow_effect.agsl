@@ -17,13 +17,14 @@
 uniform shader foreground;
 uniform shader background;
 uniform shader accumulatedSnow;
-uniform shader noise;
 uniform float2 gridSize;
 uniform float time;
 uniform float screenAspectRatio;
 uniform float2 screenSize;
+uniform float cellAspectRatio;
 uniform mat3 transformMatrixBitmap;
 uniform mat3 transformMatrixWeather;
+uniform shader snowFlakeSamples;
 
 #include "shaders/constants.agsl"
 #include "shaders/utils.agsl"
@@ -31,11 +32,13 @@ uniform mat3 transformMatrixWeather;
 
 // Snow tint.
 const vec4 snowColor = vec4(1., 1., 1., 0.95);
+
 // Background tint
 const vec4 bgdTint = vec4(0.8, 0.8, 0.8, 0.07);
 
+
 // Indices of the different snow layers.
-const float farthestSnowLayerIndex = 6;
+const float farthestSnowLayerIndex = 4;
 const float midSnowLayerIndex = 2;
 const float closestSnowLayerIndex = 0;
 
@@ -53,7 +56,8 @@ vec4 main(float2 fragCoord) {
     // Apply transform matrix to fragCoord
     float2 adjustedUv = transformPoint(transformMatrixBitmap, fragCoord);
     // Calculate uv for snow based on transformed coordinates
-    float2 uv = transformPoint(transformMatrixWeather, fragCoord) / screenSize;
+    float2 weatherUv = transformPoint(transformMatrixWeather, fragCoord);
+    float2 uv = weatherUv / screenSize;
     float2 uvAdjusted = vec2(uv.x, uv.y / screenAspectRatio);
 
     vec4 colorForeground = foreground.eval(adjustedUv);
@@ -93,27 +97,11 @@ vec4 main(float2 fragCoord) {
     color.rgb = normalBlend(color.rgb, colorForeground.rgb, colorForeground.a);
 
     // 4. Add accumulated snow layer.
-    // Load noise texture to give "fluffy-ness" to the snow. Displace the sampling of the noise.
-    vec3 cloudsNoise = noise.eval(uvAdjusted * 7000 + vec2(fragCoord.y, -fragCoord.x)).rgb;
-    // Add dither to give texture to the snow and ruffle the edges.
-    float dither = abs(triangleNoise(fragCoord * 0.01));
-
-    // Get the accumulated snow buffer. r contains its mask, g contains some random noise.
-    vec2 accSnow = accumulatedSnow.eval(adjustedUv).rg;
-    // Sharpen the mask of the accumulated snow, but not in excess.
+    vec3 accSnow = accumulatedSnow.eval(weatherUv).rgb;
     float accSnowMask = smoothstep( (1.-intensity), 1.0, /* mask= */accSnow.r);
-    if (accSnowMask > 0) {
-        // Makes the edges of the snow layer accumulation rougher.
-        accSnowMask = map(accSnowMask, 1. - cloudsNoise.b - 0.3 * dither, 1., 0., 1.);
-        // Load snow texture and dither. Make it have gray-ish values.
-        float accSnowTexture = smoothstep(0.2, 0.7, /* noise= */ accSnow.g) * 0.7;
-        accSnowTexture = map(accSnowTexture, dither - 1, 1, 0, 1);
-        // Adjust snow texture coverage/shape.
-        accSnowTexture = map(accSnowTexture, 0.67, 0.8, 0, 1);
-        accSnowMask = map(accSnowMask, 0., 1., 0., 1.- 0.6 * accSnowTexture - 0.35 * dither);
-
-        color.rgb = normalBlendNotPremultiplied(color.rgb, snowColor.rgb, snowColor.a * accSnowMask);
-    }
+    accSnowMask = map(accSnowMask, accSnow.g, 1., 0., 1.);
+    accSnowMask = map(accSnowMask, 0., 1., 0., accSnow.b);
+    color.rgb = normalBlendNotPremultiplied(color.rgb, snowColor.rgb, snowColor.a * accSnowMask);
 
     // 5. Generate snow in front of the subject.
     for (float i = midSnowLayerIndex; i >= closestSnowLayerIndex; i--) {

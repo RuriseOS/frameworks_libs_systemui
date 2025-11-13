@@ -17,7 +17,6 @@
 package com.android.mechanics
 
 import androidx.compose.runtime.FloatState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -37,6 +36,8 @@ import com.android.mechanics.spec.InputDirection
 import com.android.mechanics.spec.Mapping
 import com.android.mechanics.spec.MotionSpec
 import com.android.mechanics.spec.SegmentData
+import com.android.mechanics.spec.SegmentKey
+import com.android.mechanics.spec.SemanticKey
 import com.android.mechanics.spring.SpringState
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineName
@@ -141,6 +142,19 @@ class MotionValue(
     val isStable: Boolean by impl::isStable
 
     /**
+     * The current value for the [SemanticKey].
+     *
+     * `null` if not defined in the spec.
+     */
+    operator fun <T> get(key: SemanticKey<T>): T? {
+        return impl.semanticState(key)
+    }
+
+    /** The current segment used to compute the output. */
+    val segmentKey: SegmentKey
+        get() = impl.currentComputedValues.segment.key
+
+    /**
      * Keeps the [MotionValue]'s animated output running.
      *
      * Clients must call [keepRunning], and keep the coroutine running while the [MotionValue] is in
@@ -239,7 +253,7 @@ private class ObservableComputations(
     initialSpec: MotionSpec = MotionSpec.Empty,
     override val stableThreshold: Float,
     override val label: String?,
-) : Computations {
+) : Computations() {
 
     // ----  CurrentFrameInput ---------------------------------------------------------------------
 
@@ -294,11 +308,6 @@ private class ObservableComputations(
 
     // ---- Computations ---------------------------------------------------------------------------
 
-    override val currentSegment by derivedStateOf { computeCurrentSegment() }
-    override val currentGuaranteeState by derivedStateOf { computeCurrentGuaranteeState() }
-    override val currentAnimation by derivedStateOf { computeCurrentAnimation() }
-    override val currentSpringState by derivedStateOf { computeCurrentSpringState() }
-
     suspend fun keepRunning(continueRunning: () -> Boolean) {
         check(!isActive) { "MotionValue($label) is already running" }
         isActive = true
@@ -306,9 +315,10 @@ private class ObservableComputations(
         // These `captured*` values will be applied to the `last*` values, at the beginning
         // of the each new frame.
         // TODO(b/397837971): Encapsulate the state in a StateRecord.
-        var capturedSegment = currentSegment
-        var capturedGuaranteeState = currentGuaranteeState
-        var capturedAnimation = currentAnimation
+        val initialValues = currentComputedValues
+        var capturedSegment = initialValues.segment
+        var capturedGuaranteeState = initialValues.guarantee
+        var capturedAnimation = initialValues.animation
         var capturedSpringState = currentSpringState
         var capturedFrameTimeNanos = currentAnimationTimeNanos
         var capturedInput = currentInput
@@ -349,37 +359,36 @@ private class ObservableComputations(
                 // same time not already applying the `last*` state (as this would cause a
                 // re-computation if the current state is being read before the next frame).
                 if (isAnimatingUninterrupted) {
-                    val currentDirectMapped = currentDirectMapped
-                    val lastDirectMapped =
-                        lastSegment.mapping.map(lastInput) - lastAnimation.targetValue
-
-                    val frameDuration =
-                        (currentAnimationTimeNanos - lastFrameTimeNanos) / 1_000_000_000.0
-                    val staticDelta = (currentDirectMapped - lastDirectMapped)
-                    directMappedVelocity = (staticDelta / frameDuration).toFloat()
+                    directMappedVelocity =
+                        computeDirectMappedVelocity(currentAnimationTimeNanos - lastFrameTimeNanos)
                 } else {
                     directMappedVelocity = 0f
                 }
 
-                var scheduleNextFrame = !isStable
-                if (capturedSegment != currentSegment) {
-                    capturedSegment = currentSegment
-                    scheduleNextFrame = true
-                }
+                var scheduleNextFrame = false
+                if (!isSameSegmentAndAtRest) {
+                    // Read currentComputedValues only once and update it, if necessary
+                    val currentValues = currentComputedValues
 
-                if (capturedGuaranteeState != currentGuaranteeState) {
-                    capturedGuaranteeState = currentGuaranteeState
-                    scheduleNextFrame = true
-                }
+                    if (capturedSegment != currentValues.segment) {
+                        capturedSegment = currentValues.segment
+                        scheduleNextFrame = true
+                    }
 
-                if (capturedAnimation != currentAnimation) {
-                    capturedAnimation = currentAnimation
-                    scheduleNextFrame = true
-                }
+                    if (capturedGuaranteeState != currentValues.guarantee) {
+                        capturedGuaranteeState = currentValues.guarantee
+                        scheduleNextFrame = true
+                    }
 
-                if (capturedSpringState != currentSpringState) {
-                    capturedSpringState = currentSpringState
-                    scheduleNextFrame = true
+                    if (capturedAnimation != currentValues.animation) {
+                        capturedAnimation = currentValues.animation
+                        scheduleNextFrame = true
+                    }
+
+                    if (capturedSpringState != currentSpringState) {
+                        capturedSpringState = currentSpringState
+                        scheduleNextFrame = true
+                    }
                 }
 
                 if (capturedInput != currentInput) {

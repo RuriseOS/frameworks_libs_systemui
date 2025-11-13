@@ -16,129 +16,95 @@
 
 package com.android.systemui.monet;
 
+import static com.android.systemui.monet.TonalPalette.SHADE_KEYS;
+
 import android.util.Pair;
 
 import com.google.ux.material.libmonet.dynamiccolor.DynamicColor;
+import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme;
 import com.google.ux.material.libmonet.dynamiccolor.MaterialDynamicColors;
+import com.google.ux.material.libmonet.palettes.TonalPalette;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class DynamicColors {
+    /**
+     * Gets all DynamicColor tokens for the neutral palettes.
+     */
+    public static List<Pair<String, DynamicColor>> getAllNeutralPalette() {
+        List<Pair<String, Function<DynamicScheme, TonalPalette>>> neutralPaletteMap = Arrays.asList(
+                new Pair<>("neutral1", (s) -> s.neutralPalette),
+                new Pair<>("neutral2", (s) -> s.neutralVariantPalette)
+        );
+        // Call the helper method with the specific neutral palettes
+        return generatePaletteColors(neutralPaletteMap);
+    }
+
+    /**
+     * Gets all DynamicColor tokens for the accent palettes.
+     */
+    public static List<Pair<String, DynamicColor>> getAllAccentPalette() {
+        List<Pair<String, Function<DynamicScheme, TonalPalette>>> accentPaletteMap = Arrays.asList(
+                new Pair<>("accent1", (s) -> s.primaryPalette),
+                new Pair<>("accent2", (s) -> s.secondaryPalette),
+                new Pair<>("accent3", (s) -> s.tertiaryPalette)
+        );
+        // Call the helper method with the specific accent palettes
+        return generatePaletteColors(accentPaletteMap);
+    }
+
+    /**
+     * Gets all DynamicColor tokens for the error palette
+     */
+    public static List<Pair<String, DynamicColor>> getAllErrorPalette() {
+        List<Pair<String, Function<DynamicScheme, TonalPalette>>> errorPaletteMap = Arrays.asList(
+                new Pair<>("error", (s) -> s.errorPalette)
+        );
+
+        return generatePaletteColors(errorPaletteMap);
+    }
 
     /**
      * List of all public Dynamic Color (Light and Dark) resources
      *
-     * @param isExtendedFidelity boolean indicating if Fidelity is active
      * @return List of pairs of Resource Names / DynamicColor
      */
-    public static List<Pair<String, DynamicColor>> getAllDynamicColorsMapped(
-            boolean isExtendedFidelity) {
-        MaterialDynamicColors mdc = new MaterialDynamicColors(isExtendedFidelity);
-        final Supplier<DynamicColor>[] allColors = new Supplier[]{
-                mdc::primaryPaletteKeyColor,
-                mdc::secondaryPaletteKeyColor,
-                mdc::tertiaryPaletteKeyColor,
-                mdc::neutralPaletteKeyColor,
-                mdc::neutralVariantPaletteKeyColor,
-                mdc::background,
-                mdc::onBackground,
-                mdc::surface,
-                mdc::surfaceDim,
-                mdc::surfaceBright,
-                mdc::surfaceContainerLowest,
-                mdc::surfaceContainerLow,
-                mdc::surfaceContainer,
-                mdc::surfaceContainerHigh,
-                mdc::surfaceContainerHighest,
-                mdc::onSurface,
-                mdc::surfaceVariant,
-                mdc::onSurfaceVariant,
-                mdc::inverseSurface,
-                mdc::inverseOnSurface,
-                mdc::outline,
-                mdc::outlineVariant,
-                mdc::shadow,
-                mdc::scrim,
-                mdc::surfaceTint,
-                mdc::primary,
-                mdc::onPrimary,
-                mdc::primaryContainer,
-                mdc::onPrimaryContainer,
-                mdc::inversePrimary,
-                mdc::secondary,
-                mdc::onSecondary,
-                mdc::secondaryContainer,
-                mdc::onSecondaryContainer,
-                mdc::tertiary,
-                mdc::onTertiary,
-                mdc::tertiaryContainer,
-                mdc::onTertiaryContainer,
-                mdc::error,
-                mdc::onError,
-                mdc::errorContainer,
-                mdc::onErrorContainer,
-                mdc::controlActivated,
-                mdc::controlNormal,
-                mdc::controlHighlight,
-                mdc::textPrimaryInverse,
-                mdc::textSecondaryAndTertiaryInverse,
-                mdc::textPrimaryInverseDisableOnly,
-                mdc::textSecondaryAndTertiaryInverseDisabled,
-                mdc::textHintInverse
-        };
-
-        List<Pair<String, DynamicColor>> list = generateSysUINames(allColors);
-        return list;
+    public static List<Pair<String, DynamicColor>> getAllDynamicColorsMapped() {
+        MaterialDynamicColors mdc = new MaterialDynamicColors();
+        return generateSysUINames(mdc.allDynamicColors().stream().filter(
+                dc -> !dc.get().name.contains("fixed")).toList());
     }
 
     /**
      * List of all public Static Color resources
      *
-     * @param isExtendedFidelity boolean indicating if Fidelity is active
      * @return List of pairs of Resource Names / DynamicColor @return
      */
-    public static List<Pair<String, DynamicColor>> getFixedColorsMapped(
-            boolean isExtendedFidelity) {
-        MaterialDynamicColors mdc = new MaterialDynamicColors(isExtendedFidelity);
+    public static List<Pair<String, DynamicColor>> getFixedColorsMapped() {
+        MaterialDynamicColors mdc = new MaterialDynamicColors();
 
-        final Supplier<DynamicColor>[] allColors = new Supplier[]{
-                mdc::primaryFixed,
-                mdc::primaryFixedDim,
-                mdc::onPrimaryFixed,
-                mdc::onPrimaryFixedVariant,
-                mdc::secondaryFixed,
-                mdc::secondaryFixedDim,
-                mdc::onSecondaryFixed,
-                mdc::onSecondaryFixedVariant,
-                mdc::tertiaryFixed,
-                mdc::tertiaryFixedDim,
-                mdc::onTertiaryFixed,
-                mdc::onTertiaryFixedVariant
-        };
-
-        List<Pair<String, DynamicColor>> list = generateSysUINames(allColors);
-        return list;
+        return generateSysUINames(mdc.allDynamicColors().stream().filter(
+                dc -> dc.get().name.contains("fixed")).toList());
     }
-
 
     /**
      * List of all private SystemUI Color resources
      *
-     * @param isExtendedFidelity boolean indicating if Fidelity is active
      * @return List of pairs of Resource Names / DynamicColor
      */
-    public static List<Pair<String, DynamicColor>> getCustomColorsMapped(
-            boolean isExtendedFidelity) {
-        CustomDynamicColors customMdc = new CustomDynamicColors(isExtendedFidelity);
-        List<Pair<String, DynamicColor>> list = generateSysUINames(customMdc.allColors);
-        return list;
+    public static List<Pair<String, DynamicColor>> getCustomColorsMapped() {
+        CustomDynamicColors customMdc = new CustomDynamicColors();
+        return generateSysUINames(customMdc.allColors);
     }
 
     private static List<Pair<String, DynamicColor>> generateSysUINames(
-            Supplier<DynamicColor>[] allColors) {
+            List<Supplier<DynamicColor>> allColors) {
         List<Pair<String, DynamicColor>> list = new ArrayList<>();
 
         for (Supplier<DynamicColor> supplier : allColors) {
@@ -158,5 +124,32 @@ public class DynamicColors {
         list.sort(Comparator.comparing(pair -> pair.first));
         return list;
     }
-}
 
+    private static List<Pair<String, DynamicColor>> generatePaletteColors(
+            List<Pair<String, Function<DynamicScheme, TonalPalette>>> paletteMap) {
+
+        return paletteMap.stream()
+                .flatMap(palettePair -> {
+                    String paletteName = palettePair.first;
+                    Function<DynamicScheme, TonalPalette> paletteExtractor = palettePair.second;
+
+                    // Stream over the shades for the current palette
+                    return SHADE_KEYS.stream().map(shade -> {
+                        String tokenName = paletteName + "_" + shade;
+
+                        DynamicColor token = new DynamicColor(
+                                /* name= */ tokenName,
+                                /* palette= */ paletteExtractor,
+                                /* tone= */ (s) -> (double) ((1000.0f - shade) / 10f),
+                                /* isBackground= */ true,
+                                /* background= */ null,
+                                /* secondBackground= */ null,
+                                /* contrastCurve= */ null,
+                                /* toneDeltaPair= */ null);
+
+                        return new Pair<>(tokenName, token);
+                    });
+                })
+                .collect(Collectors.toList());
+    }
+}

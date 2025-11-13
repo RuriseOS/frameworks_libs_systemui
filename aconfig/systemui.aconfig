@@ -138,13 +138,6 @@ flag {
 }
 
 flag {
-    name: "enable_lpp_squeeze_effect"
-    namespace: "systemui"
-    description: "Enables squeeze effect on power button long press launching Gemini"
-    bug: "396099245"
-}
-
-flag {
   name: "cursor_hot_corner"
   namespace: "systemui"
   description: "Enables hot corner navigation by cursor"
@@ -159,6 +152,16 @@ flag {
 }
 
 flag {
+    name: "smartspace_weather_use_monochrome_font_icons"
+    namespace: "systemui"
+    description: "Update Smartspace to use monochrome font icons for weather"
+    bug: "389957594"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "smartspace_ui_update_resources"
     namespace: "systemui"
     description: "Read-only flag for updating resources for Smartspace UI"
@@ -167,11 +170,29 @@ flag {
 }
 
 flag {
-    name: "smartspace_remoteviews_intent_handler"
+    name: "enable_lpp_assist_invocation_effect"
     namespace: "systemui"
-    description: "Enables Smartspace RemoteViews intent handling on lockscreen"
-    bug: "399416038"
+    description: "Enables invocation effect on power button long press for launching assistant"
+    bug: "396099245"
     metadata {
          purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "enable_lpp_assist_invocation_haptic_effect"
+    namespace: "systemui"
+    description: "Enables haptics for the invocation effect on power button long press for launching assistant"
+    bug: "412325043"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+  name: "extendible_theme_manager"
+  namespace: "launcher"
+  description: "Enables custom theme manager in Launcher and Customization Picker"
+  bug: "381897614"
+}
+

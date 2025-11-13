@@ -17,4 +17,5 @@ android {
 dependencies {
     implementation("androidx.core:core")
     api(project(":NexusLauncher:Flags"))
+    api(project(":frameworks:base:packages:SystemUI:SystemUISharedFlags"))
 }
