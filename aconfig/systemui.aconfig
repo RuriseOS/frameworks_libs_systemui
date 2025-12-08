@@ -9,20 +9,6 @@ flag {
 }
 
 flag {
-    name: "return_animation_framework_library"
-    namespace: "systemui"
-    description: "Turn on Return functionality in the Animation library"
-    bug: "273205603"
-}
-
-flag {
-    name: "return_animation_framework_long_lived"
-    namespace: "systemui"
-    description: "Turn on long-lived Return registrations in the Animation library"
-    bug: "273205603"
-}
-
-flag {
     name: "shade_allow_back_gesture"
     namespace: "systemui"
     description: "Allow Back Gestures in Shade"
@@ -170,6 +156,23 @@ flag {
 }
 
 flag {
+    name: "smartspace_semantic_weather_data"
+    namespace: "systemui"
+    description: "Support semantic weather data and its rendering in Smartspace"
+    bug: "416745891"
+}
+
+flag {
+    name: "smartspace_aqi_updated_design"
+    namespace: "systemui"
+    description: "Enable updated design for aqi in Smartspace"
+    bug: "435016376"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_lpp_assist_invocation_effect"
     namespace: "systemui"
     description: "Enables invocation effect on power button long press for launching assistant"
@@ -190,9 +193,25 @@ flag {
 }
 
 flag {
+    name: "notification_dot_contrast_border"
+    namespace: "launcher"
+    description: "Draws a small black or white contrast border around notification dots according to the dot color's luminescence."
+    bug: "378990749"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "extendible_theme_manager"
   namespace: "launcher"
   description: "Enables custom theme manager in Launcher and Customization Picker"
   bug: "381897614"
 }
 
+flag {
+    name: "pan_and_zoom_in_extended_wallpaper_effects"
+    namespace: "systemui"
+    description: "Support pan & zoom for extended wallpaper effects"
+    bug: "417165168"
+}

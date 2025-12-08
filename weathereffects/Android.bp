@@ -27,6 +27,7 @@ android_library {
         // Do not add Torus dependency here, since this package is only for rendering. The host app
         // will include Torus or Livewallpaper frameworks.
         "androidx.appcompat_appcompat",
+        "//frameworks/libs/systemui:com_android_systemui_shared_flags_lib",
     ],
     srcs: [
         "graphics/src/**/*.java",

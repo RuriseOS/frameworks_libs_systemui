@@ -15,5 +15,5 @@
 //
 
 package {
-    default_team: "trendy_team_performance",
+    default_team: "trendy_team_system_ui_performance",
 }

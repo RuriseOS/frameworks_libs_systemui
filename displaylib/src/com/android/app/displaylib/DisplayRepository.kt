@@ -21,9 +21,15 @@ import android.hardware.display.DisplayManager.DisplayListener
 import android.hardware.display.DisplayManager.EVENT_TYPE_DISPLAY_ADDED
 import android.hardware.display.DisplayManager.EVENT_TYPE_DISPLAY_CHANGED
 import android.hardware.display.DisplayManager.EVENT_TYPE_DISPLAY_REMOVED
+import android.hardware.display.DisplayManager.EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_ASK
+import android.hardware.display.DisplayManager.EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_DESKTOP
+import android.hardware.display.DisplayManager.EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_MIRROR
 import android.os.Handler
 import android.util.Log
 import android.view.Display
+import com.android.app.displaylib.ExternalDisplayConnectionType.DESKTOP
+import com.android.app.displaylib.ExternalDisplayConnectionType.MIRROR
+import com.android.app.displaylib.ExternalDisplayConnectionType.NOT_SPECIFIED
 import com.android.app.tracing.FlowTracing.traceEach
 import com.android.app.tracing.traceSection
 import javax.inject.Inject
@@ -81,7 +87,7 @@ interface DisplayRepository {
     val pendingDisplay: Flow<PendingDisplay?>
 
     /** Whether the default display is currently off. */
-    val defaultDisplayOff: Flow<Boolean>
+    val defaultDisplayOff: StateFlow<Boolean>
 
     /**
      * Given a display ID int, return the corresponding Display object, or null if none exist.
@@ -112,6 +118,20 @@ interface DisplayRepository {
     interface PendingDisplay {
         /** Id of the pending display. */
         val id: Int
+
+        /**
+         * The saved connection preference for the display, either desktop, mirroring or show the
+         * dialog. Defaults to [ExternalDisplayConnectionType.NOT_SPECIFIED], if no value saved.
+         */
+        val connectionType: ExternalDisplayConnectionType
+
+        /**
+         * Updates the saved connection preference for the display, triggered by the connection
+         * dialog's "remember my choice" checkbox
+         *
+         * @see com.android.systemui.display.ui.viewmodel.ConnectingDisplayViewModel
+         */
+        suspend fun updateConnectionPreference(connectionType: ExternalDisplayConnectionType)
 
         /** Enables the display, making it available to the system. */
         suspend fun enable()
@@ -353,8 +373,28 @@ constructor(
         pendingDisplayId
             .map { displayId ->
                 val id = displayId ?: return@map null
+                val pendingDisplay = getDisplay(id) ?: displayManager.getDisplay(id)
+                val uniqueId = pendingDisplay?.uniqueId ?: return@map null
+                val connectionPreference =
+                    displayManager.getExternalDisplayConnectionPreference(uniqueId)
+
                 object : DisplayRepository.PendingDisplay {
                     override val id = id
+                    override val connectionType: ExternalDisplayConnectionType =
+                        when (connectionPreference) {
+                            EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_DESKTOP -> DESKTOP
+                            EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_MIRROR -> MIRROR
+                            else -> NOT_SPECIFIED
+                        }
+
+                    override suspend fun updateConnectionPreference(
+                        connectionType: ExternalDisplayConnectionType
+                    ) {
+                        displayManager.setExternalDisplayConnectionPreference(
+                            uniqueId,
+                            connectionType.preference,
+                        )
+                    }
 
                     override suspend fun enable() {
                         traceSection("DisplayRepository#enable($id)") {
@@ -386,11 +426,15 @@ constructor(
             }
             .debugLog("pendingDisplay")
 
-    override val defaultDisplayOff: Flow<Boolean> =
+    override val defaultDisplayOff: StateFlow<Boolean> =
         displayChangeEvent
             .filter { it == Display.DEFAULT_DISPLAY }
             .map { defaultDisplay.state == Display.STATE_OFF }
-            .distinctUntilChanged()
+            .stateIn(
+                bgApplicationScope,
+                SharingStarted.WhileSubscribed(),
+                defaultDisplay.state == Display.STATE_OFF,
+            )
 
     override fun getDisplay(displayId: Int): Display? {
         val cachedDisplay = getCachedDisplay(displayId)
@@ -457,6 +501,17 @@ constructor(
         const val TAG = "DisplayRepository"
         val DEBUG = Log.isLoggable(TAG, Log.DEBUG)
     }
+}
+
+/**
+ * Possible connection types for an external display.
+ *
+ * @property preference The integer value that represents the connection type in the system.
+ */
+enum class ExternalDisplayConnectionType(val preference: Int) {
+    NOT_SPECIFIED(EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_ASK),
+    DESKTOP(EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_DESKTOP),
+    MIRROR(EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_MIRROR),
 }
 
 /** Used to provide default implementations for all methods. */
