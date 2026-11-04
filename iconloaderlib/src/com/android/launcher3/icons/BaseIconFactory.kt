@@ -17,6 +17,7 @@ package com.android.launcher3.icons
 
 import android.content.Context
 import android.content.Intent.ShortcutIconResource
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Bitmap.Config.ARGB_8888
 import android.graphics.Canvas
@@ -66,8 +67,8 @@ constructor(
     private val shadowGenerator: ShadowGenerator by lazy { ShadowGenerator(iconBitmapSize) }
 
     /** Default IconShape for when custom shape is not needed */
-    val defaultIconShape: IconShape by
-        lazy(LazyThreadSafetyMode.NONE) { getDefaultIconShape(iconBitmapSize) }
+    val defaultIconShape: IconShape
+        get() = getDefaultIconShape(context, iconBitmapSize)
 
     @Suppress("deprecation")
     fun createIconBitmap(iconRes: ShortcutIconResource): BitmapInfo? {
@@ -487,12 +488,19 @@ constructor(
             return (ICON_BADGE_SCALE * iconSize).toInt()
         }
 
-        /** Cache of default icon shape keyed to the path size */
-        private val defaultIconShapeCache = SparseArray<WeakReference<IconShape>>()
+        private val ICON_MASK_RES_ID =
+            Resources.getSystem().getIdentifier("config_icon_mask", "string", "android")
 
-        private fun getDefaultIconShape(size: Int): IconShape {
+        /**
+         * Cache of default icon shape keyed to the path size and the system icon mask, which can
+         * change while the process is alive
+         */
+        private val defaultIconShapeCache = HashMap<String, WeakReference<IconShape>>()
+
+        private fun getDefaultIconShape(context: Context, size: Int): IconShape {
+            val key = "$size|${context.resources.getString(ICON_MASK_RES_ID)}"
             synchronized(defaultIconShapeCache) {
-                val cachedShape = defaultIconShapeCache[size]?.get()
+                val cachedShape = defaultIconShapeCache[key]?.get()
                 if (cachedShape != null) return cachedShape
 
                 val generatedShape =
@@ -503,7 +511,7 @@ constructor(
                             .iconMask,
                     )
 
-                defaultIconShapeCache[size] = WeakReference(generatedShape)
+                defaultIconShapeCache[key] = WeakReference(generatedShape)
                 return generatedShape
             }
         }

@@ -125,7 +125,7 @@ data class BitmapInfo(
                 },
             badge =
                 if (!creationFlags.hasMask(FLAG_NO_BADGE)) {
-                    getBadgeDrawable(context, creationFlags)
+                    getBadgeDrawable(context, creationFlags, iconShape)
                 } else null,
         )
 
@@ -134,9 +134,15 @@ data class BitmapInfo(
      *
      * @param context Context
      * @param isThemed If Drawable is themed.
+     * @param iconShape shape for icon badges, instead of the one they were cached with
      */
-    fun getBadgeDrawable(context: Context, isThemed: Boolean): Drawable? {
-        return getBadgeDrawable(context, if (isThemed) FLAG_THEMED else 0)
+    @JvmOverloads
+    fun getBadgeDrawable(
+        context: Context,
+        isThemed: Boolean,
+        iconShape: IconShape? = null,
+    ): Drawable? {
+        return getBadgeDrawable(context, if (isThemed) FLAG_THEMED else 0, iconShape)
     }
 
     /**
@@ -144,10 +150,16 @@ data class BitmapInfo(
      *
      * @param context Context
      * @param creationFlag Flags for creating the badge drawable
+     * @param iconShape shape of the main icon, also applied to icon badges so they follow the
+     *   current shape instead of the one they were cached with
      */
-    private fun getBadgeDrawable(context: Context, creationFlag: Int): Drawable? {
+    private fun getBadgeDrawable(
+        context: Context,
+        creationFlag: Int,
+        iconShape: IconShape? = null,
+    ): Drawable? {
         if (badgeInfo != null) {
-            return badgeInfo.newIcon(context, creationFlag, null)
+            return badgeInfo.newIcon(context, creationFlag, iconShape)
         }
         if (creationFlag.hasMask(FLAG_SKIP_USER_BADGE)) {
             return null
